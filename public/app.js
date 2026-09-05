@@ -271,24 +271,87 @@ function abrirModal(innerHtml) {
 }
 function fecharModal() { modalRaiz.innerHTML = ''; }
 
+// ---------- produtos (lista + edição de código/descrição + cadastro) ----------
+let produtoEditandoId = null;
+
 document.getElementById('btn-novo-produto').addEventListener('click', () => {
+  produtoEditandoId = null;
+  abrirModalProdutos();
+});
+
+function abrirModalProdutos() {
+  const linhas = produtosCache.map((p) => {
+    if (p.id === produtoEditandoId) {
+      return `<li>
+        <input type="text" id="pe-codigo-${p.id}" value="${p.codigo}" style="margin-bottom:6px" />
+        <input type="text" id="pe-descricao-${p.id}" value="${p.descricao}" />
+        <div class="linha-botoes">
+          <button class="botao pequeno" data-salvar-produto="${p.id}">Salvar</button>
+          <button class="botao pequeno secundario" data-cancelar-produto>Cancelar</button>
+        </div>
+      </li>`;
+    }
+    return `<li>
+      <div class="linha-produto">
+        <span><b>${p.codigo}</b> — ${p.descricao}</span>
+        <button class="botao pequeno secundario" data-editar-produto="${p.id}">editar</button>
+      </div>
+    </li>`;
+  }).join('') || '<li class="meta">Nenhum produto cadastrado ainda.</li>';
+
   abrirModal(`
-    <h3>Novo produto</h3>
+    <h3>Produtos cadastrados</h3>
+    <ul class="historico-lista">${linhas}</ul>
+    <h3 style="margin-top:18px">Novo produto</h3>
     <label>Código</label><input id="np-codigo" />
     <label>Descrição</label><input id="np-descricao" />
+    <div class="erro oculto" id="np-erro"></div>
     <div class="linha-botoes">
       <button class="botao" id="np-salvar">Salvar</button>
       <button class="botao secundario" data-fechar>Cancelar</button>
     </div>`);
+
+  modalRaiz.querySelectorAll('[data-editar-produto]').forEach((b) => {
+    b.addEventListener('click', () => {
+      produtoEditandoId = Number(b.dataset.editarProduto);
+      abrirModalProdutos();
+    });
+  });
+  modalRaiz.querySelectorAll('[data-cancelar-produto]').forEach((b) => {
+    b.addEventListener('click', () => {
+      produtoEditandoId = null;
+      abrirModalProdutos();
+    });
+  });
+  modalRaiz.querySelectorAll('[data-salvar-produto]').forEach((b) => {
+    b.addEventListener('click', async () => {
+      const id = Number(b.dataset.salvarProduto);
+      const codigo = document.getElementById(`pe-codigo-${id}`).value.trim();
+      const descricao = document.getElementById(`pe-descricao-${id}`).value.trim();
+      if (!codigo || !descricao) return;
+      await api(`/api/produtos/${id}`, { method: 'PUT', body: { codigo, descricao } });
+      produtoEditandoId = null;
+      await carregarTudo();
+      abrirModalProdutos();
+    });
+  });
+
   document.getElementById('np-salvar').addEventListener('click', async () => {
     const codigo = document.getElementById('np-codigo').value.trim();
     const descricao = document.getElementById('np-descricao').value.trim();
+    const erroEl = document.getElementById('np-erro');
+    erroEl.classList.add('oculto');
     if (!codigo || !descricao) return;
-    await api('/api/produtos', { method: 'POST', body: { codigo, descricao } });
-    fecharModal();
-    await carregarTudo();
+    try {
+      await api('/api/produtos', { method: 'POST', body: { codigo, descricao } });
+      await carregarTudo();
+      abrirModalProdutos();
+    } catch (err) {
+      erroEl.textContent = err.message;
+      erroEl.classList.remove('oculto');
+    }
   });
-});
+}
 
 document.getElementById('btn-nova-etiqueta').addEventListener('click', () => {
   const opcoesProduto = produtosCache.map((p) => `<option value="${p.id}">${p.codigo} — ${p.descricao}</option>`).join('');
