@@ -4,11 +4,13 @@ const telaLogin = document.getElementById('tela-login');
 const app = document.getElementById('app');
 const listaEl = document.getElementById('lista-etiquetas');
 const resumoEl = document.getElementById('resumo');
+const buscaEl = document.getElementById('busca');
 const modalRaiz = document.getElementById('modal-raiz');
 
 let produtosCache = [];
 let etiquetasCache = [];
 let somenteOffline = false;
+let termoBusca = '';
 
 async function api(caminho, opcoes = {}) {
   const resp = await fetch(caminho, {
@@ -170,11 +172,21 @@ function renderizarResumo() {
 
 function renderizarLista() {
   renderizarResumo();
-  const itens = somenteOffline ? etiquetasCache.filter((e) => !e.online) : etiquetasCache;
+  let itens = somenteOffline ? etiquetasCache.filter((e) => !e.online) : etiquetasCache;
+  if (termoBusca) {
+    itens = itens.filter((e) => {
+      const produto = (e.produto_descricao || '').toLowerCase();
+      const codigo = (e.produto_codigo || '').toLowerCase();
+      const local = (e.localizacao || '').toLowerCase();
+      return e.id.toLowerCase().includes(termoBusca) || produto.includes(termoBusca) || codigo.includes(termoBusca) || local.includes(termoBusca);
+    });
+  }
   if (itens.length === 0) {
-    const msg = somenteOffline && etiquetasCache.length > 0
-      ? 'Nenhuma etiqueta offline no momento.'
-      : 'Nenhuma etiqueta cadastrada ainda.';
+    let msg = 'Nenhuma etiqueta cadastrada ainda.';
+    if (etiquetasCache.length > 0) {
+      if (termoBusca) msg = `Nenhuma etiqueta encontrada para "${buscaEl.value.trim()}".`;
+      else if (somenteOffline) msg = 'Nenhuma etiqueta offline no momento.';
+    }
     listaEl.innerHTML = `<div class="vazio">${msg}</div>`;
     return;
   }
@@ -347,6 +359,11 @@ document.getElementById('btn-nova-etiqueta').addEventListener('click', () => {
 
 document.getElementById('chk-offline').addEventListener('change', (ev) => {
   somenteOffline = ev.target.checked;
+  renderizarLista();
+});
+
+buscaEl.addEventListener('input', (ev) => {
+  termoBusca = ev.target.value.toLowerCase().trim();
   renderizarLista();
 });
 
