@@ -1,6 +1,7 @@
 :root {
-  --azul: #1f3864;
-  --azul-claro: #eef2f9;
+  --marca: #f6b304;        /* amarelo da logo */
+  --marca-escura: #7a5400; /* tom escuro da marca, pra texto legível sobre fundo claro (amarelo puro como texto tem contraste ruim) */
+  --marca-clara: #fff2d6;  /* amarelo bem claro, fundo de badges */
   --verde: #2e7d32;
   --vermelho: #c62828;
   --cinza: #666;
@@ -12,23 +13,27 @@ body { margin: 0; background: #f7f8fb; color: #1a1a1a; }
 .oculto { display: none !important; }
 
 .topo {
-  background: var(--azul); color: #fff; padding: 14px 16px;
-  display: flex; justify-content: space-between; align-items: center;
+  background: #fff; color: #1a1a1a; padding: 12px 16px;
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
   position: sticky; top: 0; z-index: 5;
+  border-bottom: 3px solid var(--marca);
 }
+.topo .marca-topo { display: flex; align-items: center; gap: 8px; }
+.topo .marca-topo img { height: 32px; display: block; }
 .topo h1 { font-size: 18px; margin: 0; }
-.topo button { background: transparent; border: 1px solid #fff8; color: #fff; padding: 6px 10px; border-radius: 6px; }
+.topo button { background: transparent; border: 1px solid #0003; color: #1a1a1a; padding: 6px 10px; border-radius: 6px; }
 
 .container { max-width: 720px; margin: 0 auto; padding: 12px; }
 
 .tela-login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
 .cartao-login { background: #fff; border-radius: 12px; padding: 24px; width: 100%; max-width: 360px; box-shadow: 0 4px 20px #0002; }
-.cartao-login h1 { color: var(--azul); font-size: 22px; margin-top: 0; }
+.cartao-login img.logo-login { display: block; max-height: 130px; margin: 0 auto 14px; }
+.cartao-login .subtitulo-login { text-align: center; margin-top: 0; }
 
 label { display: block; font-size: 13px; color: var(--cinza); margin: 10px 0 4px; }
 input, select { width: 100%; padding: 10px; border: 1px solid var(--borda); border-radius: 8px; font-size: 15px; }
-.botao { display: inline-block; background: var(--azul); color: #fff; border: none; padding: 10px 16px; border-radius: 8px; font-size: 15px; cursor: pointer; margin-top: 12px; }
-.botao.secundario { background: #fff; color: var(--azul); border: 1px solid var(--azul); }
+.botao { display: inline-block; background: var(--marca); color: #1a1a1a; font-weight: 600; border: none; padding: 10px 16px; border-radius: 8px; font-size: 15px; cursor: pointer; margin-top: 12px; }
+.botao.secundario { background: #fff; color: var(--marca-escura); font-weight: 400; border: 1px solid var(--marca-escura); }
 .botao.pequeno { padding: 6px 10px; font-size: 13px; margin-top: 0; }
 .botao:disabled { opacity: .5; }
 .erro { color: var(--vermelho); font-size: 13px; margin-top: 8px; }
@@ -39,13 +44,13 @@ input, select { width: 100%; padding: 10px; border: 1px solid var(--borda); bord
 
 .cartao-etiqueta { background: #fff; border: 1px solid var(--borda); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
 .linha-topo-cartao { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-.serial { font-weight: 700; color: var(--azul); font-size: 14px; }
+.serial { font-weight: 700; color: var(--marca-escura); font-size: 14px; }
 .produto-nome { font-size: 15px; margin: 2px 0; }
 .meta { font-size: 12px; color: var(--cinza); }
 .status-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; }
 .status-dot.on { background: var(--verde); }
 .status-dot.off { background: #bbb; }
-.badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--azul-claro); color: var(--azul); }
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--marca-clara); color: var(--marca-escura); }
 .grade-info { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-top: 10px; font-size: 13px; }
 .grade-info b { display: block; font-size: 15px; }
 
