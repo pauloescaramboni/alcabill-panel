@@ -3,6 +3,7 @@
 const telaLogin = document.getElementById('tela-login');
 const app = document.getElementById('app');
 const listaEl = document.getElementById('lista-etiquetas');
+const resumoEl = document.getElementById('resumo');
 const modalRaiz = document.getElementById('modal-raiz');
 
 let produtosCache = [];
@@ -155,7 +156,20 @@ function tempoRelativo(iso) {
   return `há ${h}h`;
 }
 
+function renderizarResumo() {
+  const total = etiquetasCache.length;
+  if (total === 0) { resumoEl.innerHTML = ''; return; }
+  const online = etiquetasCache.filter((e) => e.online).length;
+  const offline = total - online;
+  resumoEl.innerHTML = `
+    <div class="resumo-item total"><b>${total}</b><span>etiquetas</span></div>
+    <div class="resumo-item online"><b>${online}</b><span>online</span></div>
+    <div class="resumo-item offline"><b>${offline}</b><span>offline</span></div>
+  `;
+}
+
 function renderizarLista() {
+  renderizarResumo();
   const itens = somenteOffline ? etiquetasCache.filter((e) => !e.online) : etiquetasCache;
   if (itens.length === 0) {
     const msg = somenteOffline && etiquetasCache.length > 0
