@@ -97,6 +97,7 @@ input:focus, select:focus {
 
 .historico-lista { list-style: none; padding: 0; margin: 8px 0 0; font-size: 13px; }
 .historico-lista li { padding: 6px 0; border-bottom: 1px solid var(--borda); }
+.linha-produto { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 
 @keyframes fundo-entrar { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modal-entrar { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
