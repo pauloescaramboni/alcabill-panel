@@ -18,47 +18,74 @@ const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 // ---------------------------------------------------------------------------
 // 1) Mini-broker (TCP) — ver src/broker/server.js para o porquê de existir.
 //    O backend se conecta nele como um cliente MQTT normal se conectaria.
+//
+//    IMPORTANTE (bug real, achado no primeiro deploy no Render): antes desta
+//    versão, o backendMqtt.connect() rodava aqui em cima, no carregamento do
+//    módulo — mas broker.listen() só rodava dentro de iniciar(), depois do
+//    await db.inicializarEsquema() (movido pra lá de propósito, pra garantir
+//    que o schema existe antes de qualquer mensagem ser processada). Isso
+//    criava uma corrida: o cliente tentava conectar ANTES do broker estar de
+//    fato escutando na porta, e como o socket de erro não tinha listener
+//    (ver client.js), o ECONNREFUSED derrubava o processo inteiro assim que
+//    o Postgres demorasse um pouquinho mais que zero milissegundos pra
+//    responder — o que, contra um banco de verdade pela rede (diferente do
+//    node:sqlite local, que era instantâneo), acontece sempre. Corrigido
+//    conectando o backend só depois de broker.listen(), dentro de iniciar().
 // ---------------------------------------------------------------------------
 const broker = createBroker();
-const backendMqtt = brokerClient.connect({ port: BROKER_PORT, clientId: 'backend' });
+let backendMqtt;
 
-backendMqtt.on('connect', () => {
-  backendMqtt.subscribe(topics.WILD.status);
-  backendMqtt.subscribe(topics.WILD.confirmacao);
-  backendMqtt.subscribe(topics.WILD.telemetria);
-  console.log('[backend] conectado ao mini-broker e assinando status/confirmação/telemetria de todas as etiquetas');
-});
+function conectarBackendMqtt() {
+  backendMqtt = brokerClient.connect({ port: BROKER_PORT, clientId: 'backend' });
 
-// Assíncrono + try/catch: mensagens chegam de fora (etiquetas reais ou
-// simuladas) e o Postgres agora responde de forma assíncrona — um erro
-// pontual de banco (ex.: uma reconexão do pool) não pode derrubar o
-// processo inteiro nem travar o recebimento das próximas mensagens.
-backendMqtt.on('message', async (topic, payload) => {
-  try {
-    const etiquetaId = topics.etiquetaIdFromTopic(topic);
-    const agora = new Date().toISOString();
+  backendMqtt.on('connect', () => {
+    backendMqtt.subscribe(topics.WILD.status);
+    backendMqtt.subscribe(topics.WILD.confirmacao);
+    backendMqtt.subscribe(topics.WILD.telemetria);
+    console.log('[backend] conectado ao mini-broker e assinando status/confirmação/telemetria de todas as etiquetas');
+  });
 
-    if (topic.endsWith('/status')) {
-      await db.prepare('UPDATE etiquetas SET online = ?, ultima_comunicacao = ? WHERE id = ?')
-        .run(payload.state === 'online' ? 1 : 0, agora, etiquetaId);
-      console.log(`[backend] status de ${etiquetaId}: ${payload.state}`);
-    } else if (topic.endsWith('/confirmacao')) {
-      const row = await db.prepare('SELECT * FROM atualizacoes WHERE id = ?').get(payload.update_id);
-      if (row) {
-        await db.prepare('UPDATE atualizacoes SET status = ?, confirmado_em = ? WHERE id = ?')
-          .run('confirmado', agora, payload.update_id);
+  // Sem isso, um erro de socket derruba o processo inteiro (EventEmitter do
+  // Node lança exceção quando 'error' é emitido sem nenhum listener). Como o
+  // broker é interno ao mesmo processo (conexão local, não é uma rede de
+  // verdade), na prática só deveria disparar se o processo já estiver
+  // morrendo por outro motivo — mas custa nada logar em vez de deixar
+  // implícito.
+  backendMqtt.on('error', (err) => {
+    console.error('[backend] erro na conexão com o mini-broker:', err.message);
+  });
+
+  // Assíncrono + try/catch: mensagens chegam de fora (etiquetas reais ou
+  // simuladas) e o Postgres agora responde de forma assíncrona — um erro
+  // pontual de banco (ex.: uma reconexão do pool) não pode derrubar o
+  // processo inteiro nem travar o recebimento das próximas mensagens.
+  backendMqtt.on('message', async (topic, payload) => {
+    try {
+      const etiquetaId = topics.etiquetaIdFromTopic(topic);
+      const agora = new Date().toISOString();
+
+      if (topic.endsWith('/status')) {
+        await db.prepare('UPDATE etiquetas SET online = ?, ultima_comunicacao = ? WHERE id = ?')
+          .run(payload.state === 'online' ? 1 : 0, agora, etiquetaId);
+        console.log(`[backend] status de ${etiquetaId}: ${payload.state}`);
+      } else if (topic.endsWith('/confirmacao')) {
+        const row = await db.prepare('SELECT * FROM atualizacoes WHERE id = ?').get(payload.update_id);
+        if (row) {
+          await db.prepare('UPDATE atualizacoes SET status = ?, confirmado_em = ? WHERE id = ?')
+            .run('confirmado', agora, payload.update_id);
+        }
+        await db.prepare('UPDATE etiquetas SET online = 1, ultima_comunicacao = ?, ultima_atualizacao_aplicada = ? WHERE id = ?')
+          .run(agora, agora, etiquetaId);
+        console.log(`[backend] confirmação de ${etiquetaId}: update ${payload.update_id} (v${payload.version}) status=${payload.status}`);
+      } else if (topic.endsWith('/telemetria')) {
+        await db.prepare('UPDATE etiquetas SET bateria_v = ?, rssi = ?, online = 1, ultima_comunicacao = ? WHERE id = ?')
+          .run(payload.bateria_v, payload.rssi, agora, etiquetaId);
       }
-      await db.prepare('UPDATE etiquetas SET online = 1, ultima_comunicacao = ?, ultima_atualizacao_aplicada = ? WHERE id = ?')
-        .run(agora, agora, etiquetaId);
-      console.log(`[backend] confirmação de ${etiquetaId}: update ${payload.update_id} (v${payload.version}) status=${payload.status}`);
-    } else if (topic.endsWith('/telemetria')) {
-      await db.prepare('UPDATE etiquetas SET bateria_v = ?, rssi = ?, online = 1, ultima_comunicacao = ? WHERE id = ?')
-        .run(payload.bateria_v, payload.rssi, agora, etiquetaId);
+    } catch (err) {
+      console.error('[backend] erro processando mensagem do broker:', topic, err.message);
     }
-  } catch (err) {
-    console.error('[backend] erro processando mensagem do broker:', topic, err.message);
-  }
-});
+  });
+}
 
 // ---------------------------------------------------------------------------
 // 2) Regras de negócio (o que a auditoria chama de "fluxo de confirmação em
@@ -294,6 +321,7 @@ const server = http.createServer(async (req, res) => {
 async function iniciar() {
   await db.inicializarEsquema();
   broker.listen(BROKER_PORT);
+  conectarBackendMqtt();
   server.listen(HTTP_PORT, () => {
     console.log(`[http] painel ALCABILL em http://localhost:${HTTP_PORT}`);
     console.log('Se ainda não criou um usuário, rode: npm run seed');
