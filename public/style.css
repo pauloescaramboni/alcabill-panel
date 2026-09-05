@@ -59,6 +59,8 @@ input:focus, select:focus {
 .botao:disabled { opacity: .5; }
 .erro { color: var(--vermelho); font-size: 13px; margin-top: 8px; }
 
+#busca { margin: 12px 0 0; }
+
 .barra-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; align-items: center; }
 .barra-acoes label.check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--cinza); }
 .barra-acoes label.check input { width: auto; }
