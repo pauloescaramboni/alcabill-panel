@@ -278,6 +278,16 @@ const server = http.createServer(async (req, res) => {
         .run(codigo, descricao, new Date().toISOString());
       return sendJson(res, 201, await db.prepare('SELECT * FROM produtos WHERE id = ?').get(Number(info.lastInsertRowid)));
     }
+    const produtoMatch = pathname.match(/^\/api\/produtos\/(\d+)$/);
+    if (produtoMatch && req.method === 'PUT') {
+      const produtoId = Number(produtoMatch[1]);
+      const { codigo, descricao } = await readBody(req);
+      if (!codigo || !descricao) return sendJson(res, 400, { erro: 'código e descrição são obrigatórios' });
+      const produto = await db.prepare('SELECT * FROM produtos WHERE id = ?').get(produtoId);
+      if (!produto) return sendJson(res, 404, { erro: 'produto não encontrado' });
+      await db.prepare('UPDATE produtos SET codigo = ?, descricao = ? WHERE id = ?').run(codigo, descricao, produtoId);
+      return sendJson(res, 200, await db.prepare('SELECT * FROM produtos WHERE id = ?').get(produtoId));
+    }
 
     // ---- etiquetas ----
     if (pathname === '/api/etiquetas' && req.method === 'GET') {
