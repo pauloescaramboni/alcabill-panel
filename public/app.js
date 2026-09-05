@@ -31,6 +31,13 @@ function mostrarApp() {
   app.classList.remove('oculto');
 }
 
+// Nome no topo + botão "Usuários" só aparece pra quem é admin (só admin
+// pode criar acesso pra mais gente — ver rota /api/usuarios no server).
+function aplicarUsuarioLogado(user) {
+  document.getElementById('usuario-nome').textContent = user.nome;
+  document.getElementById('btn-usuarios').classList.toggle('oculto', user.papel !== 'admin');
+}
+
 // ---------- login ----------
 document.getElementById('form-login').addEventListener('submit', async (ev) => {
   ev.preventDefault();
@@ -40,7 +47,7 @@ document.getElementById('form-login').addEventListener('submit', async (ev) => {
   erroEl.classList.add('oculto');
   try {
     const user = await api('/api/login', { method: 'POST', body: { email, senha } });
-    document.getElementById('usuario-nome').textContent = user.nome;
+    aplicarUsuarioLogado(user);
     mostrarApp();
     await carregarTudo();
     iniciarPolling();
@@ -54,6 +61,80 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
   await api('/api/logout', { method: 'POST' }).catch(() => {});
   mostrarLogin();
 });
+
+document.getElementById('btn-trocar-senha').addEventListener('click', () => {
+  abrirModal(`
+    <h3>Trocar senha</h3>
+    <label>Senha atual</label><input id="ts-atual" type="password" autocomplete="current-password" />
+    <label>Nova senha</label><input id="ts-nova" type="password" autocomplete="new-password" />
+    <label>Confirmar nova senha</label><input id="ts-confirmar" type="password" autocomplete="new-password" />
+    <div class="erro oculto" id="ts-erro"></div>
+    <div class="linha-botoes">
+      <button class="botao" id="ts-salvar">Salvar</button>
+      <button class="botao secundario" data-fechar>Cancelar</button>
+    </div>`);
+  document.getElementById('ts-salvar').addEventListener('click', async () => {
+    const senha_atual = document.getElementById('ts-atual').value;
+    const senha_nova = document.getElementById('ts-nova').value;
+    const confirmar = document.getElementById('ts-confirmar').value;
+    const erroEl = document.getElementById('ts-erro');
+    erroEl.classList.add('oculto');
+    if (senha_nova !== confirmar) {
+      erroEl.textContent = 'As senhas novas não coincidem.';
+      erroEl.classList.remove('oculto');
+      return;
+    }
+    try {
+      await api('/api/senha', { method: 'PUT', body: { senha_atual, senha_nova } });
+      fecharModal();
+      alert('Senha alterada com sucesso.');
+    } catch (err) {
+      erroEl.textContent = err.message;
+      erroEl.classList.remove('oculto');
+    }
+  });
+});
+
+// ---------- usuários (só admin vê o botão — ver aplicarUsuarioLogado) ----------
+document.getElementById('btn-usuarios').addEventListener('click', async () => {
+  try {
+    const usuarios = await api('/api/usuarios');
+    renderizarModalUsuarios(usuarios);
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+function renderizarModalUsuarios(usuarios) {
+  const linhas = usuarios.map((u) => `<li><b>${u.nome}</b> — ${u.email} <span class="meta">(${u.papel})</span></li>`).join('');
+  abrirModal(`
+    <h3>Usuários com acesso</h3>
+    <ul class="historico-lista">${linhas}</ul>
+    <h3 style="margin-top:18px">Adicionar usuário</h3>
+    <label>Nome</label><input id="nu-nome" />
+    <label>E-mail</label><input id="nu-email" type="email" />
+    <label>Senha</label><input id="nu-senha" type="password" autocomplete="new-password" />
+    <div class="erro oculto" id="nu-erro"></div>
+    <div class="linha-botoes">
+      <button class="botao" id="nu-salvar">Criar acesso</button>
+      <button class="botao secundario" data-fechar>Fechar</button>
+    </div>`);
+  document.getElementById('nu-salvar').addEventListener('click', async () => {
+    const nome = document.getElementById('nu-nome').value.trim();
+    const email = document.getElementById('nu-email').value.trim();
+    const senha = document.getElementById('nu-senha').value;
+    const erroEl = document.getElementById('nu-erro');
+    erroEl.classList.add('oculto');
+    try {
+      await api('/api/usuarios', { method: 'POST', body: { nome, email, senha } });
+      const atualizados = await api('/api/usuarios');
+      renderizarModalUsuarios(atualizados);
+    } catch (err) {
+      erroEl.textContent = err.message;
+      erroEl.classList.remove('oculto');
+    }
+  });
+}
 
 // ---------- carregamento ----------
 async function carregarTudo() {
@@ -103,7 +184,6 @@ function cartaoHtml(e) {
       <span class="badge">${e.status}</span>
     </div>
     <div class="grade-info">
-      <div>Quantidade<b>${e.quantidade}</b></div>
       <div>Localização<b>${e.localizacao || '—'}</b></div>
       <div>Bateria<b>${bateria}</b></div>
       <div>Versão<b>v${e.version}</b></div>
@@ -119,8 +199,6 @@ function alternarEdicao(id) {
   if (aberto) return;
   const e = etiquetasCache.find((x) => x.id === id);
   painel.innerHTML = `
-    <label>Quantidade</label>
-    <input type="number" id="qtd-${id}" value="${e.quantidade}" />
     <label>Localização</label>
     <input type="text" id="loc-${id}" value="${e.localizacao || ''}" />
     <label>Status</label>
@@ -140,10 +218,9 @@ function alternarEdicao(id) {
 }
 
 async function salvarEdicao(id) {
-  const quantidade = Number(document.getElementById(`qtd-${id}`).value);
   const localizacao = document.getElementById(`loc-${id}`).value;
   const status = document.getElementById(`sts-${id}`).value;
-  await api(`/api/etiquetas/${id}`, { method: 'PUT', body: { quantidade, localizacao, status } });
+  await api(`/api/etiquetas/${id}`, { method: 'PUT', body: { localizacao, status } });
   await carregarTudo();
 }
 
@@ -191,22 +268,66 @@ document.getElementById('btn-nova-etiqueta').addEventListener('click', () => {
   const opcoesProduto = produtosCache.map((p) => `<option value="${p.id}">${p.codigo} — ${p.descricao}</option>`).join('');
   abrirModal(`
     <h3>Nova etiqueta</h3>
-    <label>Produto</label>
-    <select id="ne-produto">${opcoesProduto || '<option value="">(cadastre um produto primeiro)</option>'}</select>
-    <label>Quantidade inicial</label><input id="ne-quantidade" type="number" value="0" />
+    <div id="ne-bloco-produto-existente">
+      <label>Produto</label>
+      <select id="ne-produto">${opcoesProduto || '<option value="">(nenhum produto cadastrado ainda)</option>'}</select>
+      <button type="button" class="botao pequeno secundario" id="ne-ir-novo-produto" style="margin-top:6px">+ cadastrar novo produto</button>
+    </div>
+    <div id="ne-bloco-produto-novo" class="oculto">
+      <label>Código do produto</label>
+      <input id="ne-novo-codigo" placeholder="ex.: CAM-001" />
+      <label>Descrição do produto</label>
+      <input id="ne-novo-descricao" placeholder="ex.: Camiseta azul M" />
+      <button type="button" class="botao pequeno secundario" id="ne-ir-produto-existente" style="margin-top:6px">← usar produto já cadastrado</button>
+    </div>
     <label>Localização</label><input id="ne-localizacao" placeholder="ex.: A-03-02" />
+    <div class="erro oculto" id="ne-erro"></div>
     <div class="linha-botoes">
       <button class="botao" id="ne-salvar">Criar</button>
       <button class="botao secundario" data-fechar>Cancelar</button>
     </div>`);
+
+  // Atalho pra não obrigar a cadastrar o produto num passo separado antes —
+  // alterna entre "escolher produto existente" e "digitar um produto novo"
+  // dentro do próprio modal de criar etiqueta.
+  const blocoExistente = document.getElementById('ne-bloco-produto-existente');
+  const blocoNovo = document.getElementById('ne-bloco-produto-novo');
+  document.getElementById('ne-ir-novo-produto').addEventListener('click', () => {
+    blocoExistente.classList.add('oculto');
+    blocoNovo.classList.remove('oculto');
+  });
+  document.getElementById('ne-ir-produto-existente').addEventListener('click', () => {
+    blocoNovo.classList.add('oculto');
+    blocoExistente.classList.remove('oculto');
+  });
+
   document.getElementById('ne-salvar').addEventListener('click', async () => {
-    const produto_id = Number(document.getElementById('ne-produto').value) || null;
-    const quantidade = Number(document.getElementById('ne-quantidade').value) || 0;
+    const erroEl = document.getElementById('ne-erro');
+    erroEl.classList.add('oculto');
     const localizacao = document.getElementById('ne-localizacao').value.trim();
-    const nova = await api('/api/etiquetas', { method: 'POST', body: { produto_id, quantidade, localizacao } });
-    fecharModal();
-    await carregarTudo();
-    alert(`Etiqueta ${nova.id} criada. Rode o simulador apontando para esse ID para vê-la responder:\n\nnpm run simulador -- --id=${nova.id}`);
+    try {
+      let produto_id;
+      if (!blocoNovo.classList.contains('oculto')) {
+        const codigo = document.getElementById('ne-novo-codigo').value.trim();
+        const descricao = document.getElementById('ne-novo-descricao').value.trim();
+        if (!codigo || !descricao) {
+          erroEl.textContent = 'Preencha código e descrição do novo produto.';
+          erroEl.classList.remove('oculto');
+          return;
+        }
+        const novoProduto = await api('/api/produtos', { method: 'POST', body: { codigo, descricao } });
+        produto_id = novoProduto.id;
+      } else {
+        produto_id = Number(document.getElementById('ne-produto').value) || null;
+      }
+      const nova = await api('/api/etiquetas', { method: 'POST', body: { produto_id, localizacao } });
+      fecharModal();
+      await carregarTudo();
+      alert(`Etiqueta ${nova.id} criada. Rode o simulador apontando para esse ID para vê-la responder:\n\nnpm run simulador -- --id=${nova.id}`);
+    } catch (err) {
+      erroEl.textContent = err.message;
+      erroEl.classList.remove('oculto');
+    }
   });
 });
 
@@ -222,7 +343,7 @@ function iniciarPolling() {
 
 // tenta restaurar sessão existente ao abrir a página
 api('/api/me').then((user) => {
-  document.getElementById('usuario-nome').textContent = user.nome;
+  aplicarUsuarioLogado(user);
   mostrarApp();
   carregarTudo();
   iniciarPolling();
