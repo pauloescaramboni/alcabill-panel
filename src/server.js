@@ -120,7 +120,6 @@ async function publicarComando(etiquetaId) {
     version: etiqueta.version,
     codigo: produto ? produto.codigo : null,
     descricao: produto ? produto.descricao : null,
-    quantidade: etiqueta.quantidade,
     localizacao: etiqueta.localizacao,
     status: etiqueta.status,
     timestamp: new Date().toISOString(),
@@ -179,7 +178,7 @@ function requireLogin(req, res) {
   return session;
 }
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg' };
 
 function serveStatic(req, res, pathname) {
   let filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
@@ -235,6 +234,39 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { nome: usuario.nome, email: usuario.email, papel: usuario.papel });
     }
 
+    if (pathname === '/api/senha' && req.method === 'PUT') {
+      const { senha_atual, senha_nova } = await readBody(req);
+      if (!senha_atual || !senha_nova) return sendJson(res, 400, { erro: 'informe a senha atual e a nova senha' });
+      if (senha_nova.length < 6) return sendJson(res, 400, { erro: 'a nova senha deve ter pelo menos 6 caracteres' });
+      if (!auth.verifyPassword(senha_atual, usuario.senha_hash, usuario.salt)) {
+        return sendJson(res, 401, { erro: 'senha atual incorreta' });
+      }
+      const { hash, salt } = auth.hashPassword(senha_nova);
+      await db.prepare('UPDATE usuarios SET senha_hash = ?, salt = ? WHERE id = ?').run(hash, salt, usuario.id);
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // ---- usuários (gerenciado só por admin — ex.: dar acesso a mais gente
+    // no mesmo estoque, como um colega/amigo) ----
+    if (pathname === '/api/usuarios' && req.method === 'GET') {
+      if (usuario.papel !== 'admin') return sendJson(res, 403, { erro: 'só administradores podem ver os usuários' });
+      const rows = await db.prepare('SELECT id, nome, email, papel, criado_em FROM usuarios ORDER BY id').all();
+      return sendJson(res, 200, rows);
+    }
+    if (pathname === '/api/usuarios' && req.method === 'POST') {
+      if (usuario.papel !== 'admin') return sendJson(res, 403, { erro: 'só administradores podem criar novos usuários' });
+      const { nome, email, senha } = await readBody(req);
+      if (!nome || !email || !senha) return sendJson(res, 400, { erro: 'nome, e-mail e senha são obrigatórios' });
+      if (senha.length < 6) return sendJson(res, 400, { erro: 'a senha deve ter pelo menos 6 caracteres' });
+      const existente = await db.prepare('SELECT id FROM usuarios WHERE email = ?').get(email);
+      if (existente) return sendJson(res, 400, { erro: 'já existe um usuário com esse e-mail' });
+      const { hash, salt } = auth.hashPassword(senha);
+      const info = await db.prepare(
+        'INSERT INTO usuarios (nome, email, senha_hash, salt, papel, criado_em) VALUES (?, ?, ?, ?, ?, ?)'
+      ).run(nome, email, hash, salt, 'usuario', new Date().toISOString());
+      return sendJson(res, 201, { id: Number(info.lastInsertRowid), nome, email, papel: 'usuario' });
+    }
+
     // ---- produtos ----
     if (pathname === '/api/produtos' && req.method === 'GET') {
       return sendJson(res, 200, await db.prepare('SELECT * FROM produtos ORDER BY id DESC').all());
@@ -258,12 +290,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/etiquetas' && req.method === 'POST') {
-      const { produto_id, quantidade = 0, localizacao = '' } = await readBody(req);
+      const { produto_id, localizacao = '' } = await readBody(req);
       const id = await proximoSerial();
       await db.prepare(`
-        INSERT INTO etiquetas (id, produto_id, quantidade, localizacao, status, version, online, criado_em)
-        VALUES (?, ?, ?, ?, 'ativo', 1, 0, ?)
-      `).run(id, produto_id || null, quantidade, localizacao, new Date().toISOString());
+        INSERT INTO etiquetas (id, produto_id, localizacao, status, version, online, criado_em)
+        VALUES (?, ?, ?, 'ativo', 1, 0, ?)
+      `).run(id, produto_id || null, localizacao, new Date().toISOString());
       await registrarHistorico(id, 'criação', null, `etiqueta ${id} criada`, usuario.nome);
       await publicarComando(id);
       return sendJson(res, 201, await db.prepare('SELECT * FROM etiquetas WHERE id = ?').get(id));
@@ -280,7 +312,7 @@ const server = http.createServer(async (req, res) => {
 
       if (!sub && req.method === 'PUT') {
         const alteracoes = await readBody(req);
-        const campos = ['quantidade', 'localizacao', 'status'];
+        const campos = ['localizacao', 'status'];
         let mudou = false;
         for (const campo of campos) {
           if (alteracoes[campo] !== undefined && String(alteracoes[campo]) !== String(etiqueta[campo])) {
