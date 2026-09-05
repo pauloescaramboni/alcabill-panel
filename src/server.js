@@ -313,6 +313,27 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// Cria o usuário admin padrão se o banco ainda não tiver nenhum usuário —
+// mesma lógica de scripts/seed.js, só que rodando sozinha na subida do
+// servidor. Necessário porque, no Render (free tier), não tem um jeito fácil
+// de rodar "npm run seed" à parte contra o Postgres de produção (sem shell/
+// job avulso disponível) — então o próprio boot garante que sempre existe
+// pelo menos um login válido. Idempotente: se já existe usuário, não faz nada.
+async function garantirUsuarioAdmin() {
+  const row = await db.prepare('SELECT COUNT(*) AS n FROM usuarios').get();
+  if (Number(row.n) > 0) return;
+
+  const email = process.env.ADMIN_EMAIL || 'admin@alcabill.local';
+  const senha = process.env.ADMIN_SENHA || 'alcabill123';
+  const { hash, salt } = auth.hashPassword(senha);
+  await db.prepare(
+    'INSERT INTO usuarios (nome, email, senha_hash, salt, papel, criado_em) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run('Administrador', email, hash, salt, 'admin', new Date().toISOString());
+
+  console.log(`[startup] nenhum usuário existia — criei o admin padrão automaticamente: ${email}`);
+  console.log('[startup] troque essa senha assim que logar pela primeira vez.');
+}
+
 // ---------------------------------------------------------------------------
 // 4) Inicialização: garante o schema do Postgres antes de aceitar qualquer
 //    conexão (broker ou HTTP) — assim nenhuma mensagem/requisição chega
@@ -320,6 +341,7 @@ const server = http.createServer(async (req, res) => {
 // ---------------------------------------------------------------------------
 async function iniciar() {
   await db.inicializarEsquema();
+  await garantirUsuarioAdmin();
   broker.listen(BROKER_PORT);
   conectarBackendMqtt();
   server.listen(HTTP_PORT, () => {
