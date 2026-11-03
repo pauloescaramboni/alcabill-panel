@@ -32,6 +32,7 @@
   --vidro-borda: 1px solid rgba(214, 214, 214, .14);
   --vidro-realce: inset 0 1px 0 rgba(214, 214, 214, .08);
   --sombra-bloco: 0 20px 50px rgba(0, 0, 0, .45);
+  --sombra-logo: drop-shadow(0 10px 22px rgba(0,0,0,.7)) drop-shadow(0 2px 4px rgba(0,0,0,.5));
   --marca-hover: rgba(245, 184, 0, .1);
   --marca-foco: rgba(245, 184, 0, .22);
   --vidro-blur: blur(14px) saturate(140%);
@@ -90,7 +91,7 @@ button, input, select { font: inherit; color: inherit; }
   padding: 28px 22px; width: 100%; max-width: 380px;
   animation: login-entrar .3s ease;
 }
-.cartao-login img.logo-login { display: block; max-width: 100%; max-height: 150px; margin: 0 auto 16px; }
+.cartao-login img.logo-login { display: block; max-width: 100%; max-height: 150px; margin: 0 auto 16px; filter: var(--sombra-logo); }
 .cartao-login .subtitulo-login { text-align: center; margin: 0 0 8px; font-size: 16px; color: var(--texto); font-weight: 600; }
 .cartao-login label { color: var(--texto); font-weight: 600; font-size: 15px; margin-top: 16px; }
 .cartao-login input { font-size: 17px; }
