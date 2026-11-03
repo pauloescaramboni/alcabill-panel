@@ -11,6 +11,10 @@ let produtosCache = [];
 let etiquetasCache = [];
 let somenteOffline = false;
 let termoBusca = '';
+// Etiqueta cujo painel de edição está aberto (null = nenhum). Guardado fora do
+// DOM porque a lista é recriada via innerHTML e o DOM perde esse estado.
+let edicaoAbertaId = null;
+let listaPendente = false; // polling chegou enquanto o usuário editava
 
 async function api(caminho, opcoes = {}) {
   const resp = await fetch(caminho, {
@@ -140,10 +144,32 @@ function renderizarModalUsuarios(usuarios) {
 }
 
 // ---------- carregamento ----------
-async function carregarTudo() {
+async function carregarTudo({ doPolling = false } = {}) {
   const [produtos, etiquetas] = await Promise.all([api('/api/produtos'), api('/api/etiquetas')]);
   produtosCache = produtos;
   etiquetasCache = etiquetas;
+  // O polling não pode recriar a lista enquanto o usuário edita (painel aberto,
+  // campo focado na lista ou modal aberto): isso fechava o painel a cada 3 s e
+  // apagava o que foi digitado. Só atualiza os contadores e deixa a lista para
+  // depois de salvar/fechar.
+  if (doPolling && usuarioEditando()) {
+    listaPendente = true;
+    renderizarResumo();
+    return;
+  }
+  renderizarLista();
+}
+
+function usuarioEditando() {
+  if (edicaoAbertaId) return true;
+  if (modalRaiz.childElementCount > 0) return true;
+  const ativo = document.activeElement;
+  return !!(ativo && ativo !== document.body && listaEl.contains(ativo));
+}
+
+function aplicarListaPendente() {
+  if (!listaPendente) return;
+  listaPendente = false;
   renderizarLista();
 }
 
@@ -219,10 +245,32 @@ function renderizarLista() {
     listaEl.innerHTML = `<div class="vazio">${msg}</div>`;
     return;
   }
+  // Se um painel estiver aberto (ex.: re-render pela busca), preserva o que já
+  // foi digitado e reabre o painel depois de recriar os cartões.
+  const rascunho = lerRascunhoEdicao();
   listaEl.innerHTML = itens.map(cartaoHtml).join('');
-  itens.forEach((e) => {
-    document.getElementById(`cartao-${e.id}`).querySelector('.linha-topo-cartao').addEventListener('click', () => alternarEdicao(e.id));
-  });
+  if (edicaoAbertaId) {
+    if (itens.some((e) => e.id === edicaoAbertaId)) abrirEdicao(edicaoAbertaId, rascunho);
+    else edicaoAbertaId = null;
+  }
+}
+
+// Um único listener delegado na lista (registrado uma vez, não a cada render):
+// só o topo do cartão alterna o painel; cliques dentro do painel são ignorados.
+listaEl.addEventListener('click', (ev) => {
+  if (ev.target.closest('.painel-edicao')) return;
+  const topo = ev.target.closest('.linha-topo-cartao');
+  if (!topo) return;
+  const cartao = topo.closest('.cartao-etiqueta');
+  if (cartao) alternarEdicao(cartao.dataset.id);
+});
+
+function lerRascunhoEdicao() {
+  if (!edicaoAbertaId) return null;
+  const loc = document.getElementById(`loc-${edicaoAbertaId}`);
+  const sts = document.getElementById(`sts-${edicaoAbertaId}`);
+  if (!loc || !sts) return null;
+  return { localizacao: loc.value, status: sts.value };
 }
 
 function cartaoHtml(e) {
@@ -235,7 +283,7 @@ function cartaoHtml(e) {
     : '';
   const produto = e.produto_descricao || '(sem produto vinculado)';
   return `
-  <div class="cartao-etiqueta" id="cartao-${e.id}">
+  <div class="cartao-etiqueta" id="cartao-${e.id}" data-id="${e.id}">
     <div class="linha-topo-cartao">
       <div>
         <div class="serial">${e.id}</div>
@@ -252,18 +300,31 @@ function cartaoHtml(e) {
   </div>`;
 }
 
+function fecharEdicao() {
+  document.querySelectorAll('.painel-edicao').forEach((p) => { p.classList.add('oculto'); p.innerHTML = ''; });
+  edicaoAbertaId = null;
+}
+
 function alternarEdicao(id) {
+  const jaAberto = edicaoAbertaId === id;
+  fecharEdicao();
+  if (jaAberto) { aplicarListaPendente(); return; }
+  abrirEdicao(id);
+}
+
+function abrirEdicao(id, rascunho = null) {
   const painel = document.getElementById(`edicao-${id}`);
-  const aberto = !painel.classList.contains('oculto');
-  document.querySelectorAll('.painel-edicao').forEach((p) => p.classList.add('oculto'));
-  if (aberto) return;
   const e = etiquetasCache.find((x) => x.id === id);
+  if (!painel || !e) return;
+  edicaoAbertaId = id;
+  const valorLoc = rascunho ? rascunho.localizacao : (e.localizacao || '');
+  const valorSts = rascunho ? rascunho.status : e.status;
   painel.innerHTML = `
     <label>Localização</label>
-    <input type="text" id="loc-${id}" value="${e.localizacao || ''}" />
+    <input type="text" id="loc-${id}" />
     <label>Status</label>
     <select id="sts-${id}">
-      ${Object.keys(ROTULOS_STATUS).map((s) => `<option value="${s}" ${s === e.status ? 'selected' : ''}>${ROTULOS_STATUS[s]}</option>`).join('')}
+      ${Object.keys(ROTULOS_STATUS).map((s) => `<option value="${s}" ${s === valorSts ? 'selected' : ''}>${ROTULOS_STATUS[s]}</option>`).join('')}
     </select>
     <div class="linha-botoes">
       <button class="botao pequeno" data-acao="salvar">Salvar</button>
@@ -271,6 +332,7 @@ function alternarEdicao(id) {
       <button class="botao pequeno secundario" data-acao="historico">Ver histórico</button>
     </div>
   `;
+  painel.querySelector(`#loc-${id}`).value = valorLoc;
   painel.classList.remove('oculto');
   painel.querySelector('[data-acao="salvar"]').addEventListener('click', () => salvarEdicao(id));
   painel.querySelector('[data-acao="reenviar"]').addEventListener('click', () => reenviar(id));
@@ -281,6 +343,9 @@ async function salvarEdicao(id) {
   const localizacao = document.getElementById(`loc-${id}`).value;
   const status = document.getElementById(`sts-${id}`).value;
   await api(`/api/etiquetas/${id}`, { method: 'PUT', body: { localizacao, status } });
+  if (document.activeElement && listaEl.contains(document.activeElement)) document.activeElement.blur();
+  fecharEdicao();
+  listaPendente = false;
   await carregarTudo();
 }
 
@@ -303,7 +368,10 @@ function abrirModal(innerHtml) {
   modalRaiz.querySelectorAll('[data-fechar]').forEach((b) => b.addEventListener('click', fecharModal));
   modalRaiz.querySelector('.modal-fundo').addEventListener('click', (ev) => { if (ev.target.classList.contains('modal-fundo')) fecharModal(); });
 }
-function fecharModal() { modalRaiz.innerHTML = ''; }
+function fecharModal() {
+  modalRaiz.innerHTML = '';
+  aplicarListaPendente();
+}
 
 // ---------- produtos (lista + edição de código/descrição + cadastro) ----------
 let produtoEditandoId = null;
@@ -465,8 +533,11 @@ buscaEl.addEventListener('input', (ev) => {
 });
 
 // ---------- polling leve (sem WebSocket — ver README) ----------
+const INTERVALO_POLLING_MS = window.__ALCABILL_POLLING_MS || 3000;
+let pollingId = null;
 function iniciarPolling() {
-  setInterval(() => { carregarTudo().catch(() => {}); }, 3000);
+  if (pollingId) return; // login + sessão restaurada não criam dois intervalos
+  pollingId = setInterval(() => { carregarTudo({ doPolling: true }).catch(() => {}); }, INTERVALO_POLLING_MS);
 }
 
 // ---------- menu da conta (≡ no topo) ----------
