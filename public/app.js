@@ -202,7 +202,9 @@ function algumaComunicou() {
 function renderizarResumo() {
   const total = etiquetasCache.length;
   if (total === 0) { resumoEl.innerHTML = ''; return; }
-  const comStatus = algumaComunicou();
+  // Os três contadores aparecem sempre (pedido do usuário), mesmo antes de a
+  // placa reportar status: até lá, "online" fica em 0.
+  const comStatus = true;
   resumoEl.classList.toggle('unico', !comStatus);
   if (!comStatus) {
     resumoEl.innerHTML = `<div class="resumo-item total"><b>${total}</b><span>etiquetas</span></div>`;
@@ -287,6 +289,7 @@ function cartaoHtml(e) {
     <div class="linha-topo-cartao">
       <div>
         <div class="serial">${e.id}</div>
+        ${e.produto_codigo ? `<div class="produto-codigo">${e.produto_codigo}</div>` : ''}
         <div class="produto-nome">${produto}</div>
         ${linhaStatus}
       </div>

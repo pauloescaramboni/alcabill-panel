@@ -221,8 +221,10 @@ select option { background: var(--superficie); color: var(--texto); }
 }
 .linha-topo-cartao { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; cursor: pointer; }
 .linha-topo-cartao > div { min-width: 0; }
-.serial { font-weight: 700; color: var(--marca); font-size: 17px; letter-spacing: .01em; font-variant-numeric: tabular-nums; }
-.produto-nome { font-size: 19px; font-weight: 700; letter-spacing: -.01em; text-transform: uppercase; color: var(--texto); margin: 2px 0 4px; line-height: 1.2; overflow-wrap: anywhere; }
+.serial { font-weight: 700; color: var(--marca); font-size: 14px; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+/* código da peça em destaque, acima do nome */
+.produto-codigo { font-size: 24px; font-weight: 800; letter-spacing: -.01em; color: var(--texto); margin: 4px 0 0; line-height: 1.15; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.produto-nome { font-size: 15px; font-weight: 600; letter-spacing: 0; text-transform: uppercase; color: var(--texto-2); margin: 2px 0 4px; line-height: 1.25; overflow-wrap: anywhere; }
 .meta { font-size: 14px; color: var(--texto-2); }
 .status-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }
 .status-dot.on { background: var(--verde); box-shadow: 0 0 0 3px rgba(61, 220, 104, .18); }
