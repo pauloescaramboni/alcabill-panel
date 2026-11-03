@@ -441,6 +441,35 @@ function iniciarPolling() {
   setInterval(() => { carregarTudo().catch(() => {}); }, 3000);
 }
 
+// ---------- menu da conta (≡ no topo) ----------
+function iniciarMenuConta() {
+  const botao = document.getElementById('btn-menu');
+  const menu = document.getElementById('menu-conta');
+  if (!botao || !menu) return;
+  const aberto = () => botao.getAttribute('aria-expanded') === 'true';
+  function abrir() {
+    menu.hidden = false;
+    botao.setAttribute('aria-expanded', 'true');
+    botao.setAttribute('aria-label', 'Fechar menu');
+    requestAnimationFrame(() => requestAnimationFrame(() => menu.classList.add('aberto')));
+  }
+  function fechar(devolverFoco) {
+    if (!aberto()) return;
+    menu.classList.remove('aberto');
+    menu.hidden = true;
+    botao.setAttribute('aria-expanded', 'false');
+    botao.setAttribute('aria-label', 'Abrir menu');
+    if (devolverFoco) botao.focus();
+  }
+  botao.addEventListener('click', () => (aberto() ? fechar(false) : abrir()));
+  menu.addEventListener('click', (ev) => { if (ev.target.closest('.item-menu')) fechar(false); });
+  document.addEventListener('click', (ev) => {
+    if (aberto() && !menu.contains(ev.target) && !botao.contains(ev.target)) fechar(false);
+  });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && aberto()) fechar(true); });
+}
+iniciarMenuConta();
+
 // tenta restaurar sessão existente ao abrir a página
 api('/api/me').then((user) => {
   aplicarUsuarioLogado(user);

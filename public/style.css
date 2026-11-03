@@ -55,45 +55,74 @@ button, input, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
 
 /* ---------- topo ---------- */
+/* linha 1: nome + botão ≡; linha 2: usuário logado. Menu ancorado abaixo do botão. */
 .topo {
   background: transparent; padding: 14px 16px;
   border: 0; box-shadow: none;
-  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
-  position: relative; z-index: 5;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+  column-gap: 12px; row-gap: 2px;
+  position: relative; z-index: 20;
 }
-.topo .marca-topo { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.topo .marca-topo { grid-column: 1; grid-row: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
 .topo h1 {
   font-family: "Jost", "Futura", "Century Gothic", sans-serif;
   font-size: 28px; font-weight: 400; letter-spacing: .08em; line-height: 1.1;
   margin: 0; color: var(--marca-nome); text-shadow: none;
 }
-.topo .marca-topo { flex: 0 0 auto; }
-.acoes-topo { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; }
-.acoes-topo .usuario-topo {
+.topo .usuario-topo {
+  grid-column: 1 / -1; grid-row: 2;
   font-size: 14px; font-weight: 600; color: var(--texto-2);
   min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-/* dock de vidro escuro em pílula */
-.dock-topo {
-  flex: 0 0 auto; display: flex; align-items: center; gap: 4px; padding: 5px;
-  border: 0; border-radius: 999px; background: rgba(32,32,32,.55);
+
+/* botão hambúrguer: 3 barras que viram X */
+.botao-menu {
+  grid-column: 2; grid-row: 1; justify-self: end;
+  position: relative; width: 44px; height: 44px; padding: 0; margin: 0;
+  border: 0; border-radius: 12px; background: transparent; color: var(--texto); cursor: pointer;
+  transition: background-color .15s ease, box-shadow .15s ease;
+}
+.botao-menu:hover, .botao-menu:focus-visible { background: rgba(214,214,214,.10); }
+.botao-menu:active { background: rgba(214,214,214,.18); }
+.botao-menu:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.botao-menu .barra {
+  position: absolute; left: 11px; top: 20.75px; width: 22px; height: 2.5px;
+  border-radius: 2px; background: currentColor;
+  transition: transform .25s ease, opacity .25s ease;
+}
+.botao-menu .barra:nth-child(1) { transform: translateY(-8.5px); }
+.botao-menu .barra:nth-child(3) { transform: translateY(8.5px); }
+.botao-menu[aria-expanded="true"] .barra:nth-child(1) { transform: rotate(45deg); }
+.botao-menu[aria-expanded="true"] .barra:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.botao-menu[aria-expanded="true"] .barra:nth-child(3) { transform: rotate(-45deg); }
+
+/* painel dropdown de vidro fosco */
+.menu-conta {
+  position: absolute; top: 62px; right: 16px; z-index: 30;
+  width: 220px; max-width: calc(100vw - 32px); padding: 6px;
+  display: flex; flex-direction: column;
+  border: 0; border-radius: 18px; background: rgba(32,32,32,.72);
   -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%);
-  box-shadow: inset 0 1px 0 rgba(214,214,214,.08), 0 10px 30px rgba(0,0,0,.35);
+  box-shadow: inset 0 1px 0 rgba(214,214,214,.08), 0 16px 40px rgba(0,0,0,.45);
+  transform-origin: top right;
+  opacity: 0; transform: translateY(-6px) scale(.98);
+  transition: opacity .18s ease, transform .18s ease;
 }
-.dock-topo .botao-icone {
-  width: 44px; height: 44px; padding: 0; margin: 0; border: 0; border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
-  background: transparent; color: var(--texto); cursor: pointer;
-  transition: background-color .15s ease, color .15s ease, box-shadow .15s ease;
+.menu-conta[hidden] { display: none; }
+.menu-conta.aberto { opacity: 1; transform: none; }
+.item-menu {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  height: 48px; padding: 0 12px; margin: 0; border: 0; border-radius: 12px;
+  background: transparent; color: var(--texto); cursor: pointer; text-align: left;
+  font: inherit; font-size: 15px; font-weight: 600;
+  transition: background-color .15s ease, box-shadow .15s ease;
 }
-.dock-topo .botao-icone svg { width: 22px; height: 22px; display: block; }
-.dock-topo .botao-icone:hover,
-.dock-topo .botao-icone:focus-visible { background: rgba(214,214,214,.10); }
-.dock-topo .botao-icone:active { background: rgba(214,214,214,.18); }
-.dock-topo .botao-icone:focus-visible { outline: none; box-shadow: var(--anel-foco); }
-.dock-topo .botao-sair { color: var(--texto-2); }
-.dock-topo .botao-sair:hover { color: #fca5a5; }
-/* Topo empilhado: nome, "Administrador" e, embaixo dele, a pílula. */
+.item-menu svg { width: 22px; height: 22px; flex: 0 0 auto; display: block; }
+.item-menu:hover, .item-menu:focus-visible { background: rgba(214,214,214,.10); }
+.item-menu:active { background: rgba(214,214,214,.18); }
+.item-menu:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.item-menu.item-sair { color: #fca5a5; }
+.separador-menu { height: 1px; margin: 4px 8px; background: rgba(214,214,214,.10); }
 
 .container { max-width: 720px; margin: 0 auto; padding: 16px; }
 
@@ -245,7 +274,7 @@ select option { background: var(--superficie); color: var(--texto); }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .cartao-login, input, select, .resumo-item, .cartao-etiqueta, .modal,
   .botao.secundario { background-color: var(--vidro-solido); }
-  .dock-topo { background-color: rgba(32,32,32,.92); }
+  .menu-conta { background-color: rgba(32,32,32,.96); }
 }
 
 @media (max-width: 380px) {
