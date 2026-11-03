@@ -6,13 +6,15 @@
   "scripts": {
     "start": "node src/server.js",
     "seed": "node scripts/seed.js",
-    "simulador": "node simulator/etiqueta-sim.js"
+    "simulador": "node simulator/etiqueta-sim.js",
+    "test": "node scripts/test-bridge.js"
   },
   "engines": {
     "node": ">=22.5.0"
   },
   "dependencies": {
-    "pg": "^8.13.0"
+    "pg": "^8.13.0",
+    "mqtt": "^5.10.1"
   },
   "license": "UNLICENSED"
 }

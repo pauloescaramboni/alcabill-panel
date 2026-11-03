@@ -10,6 +10,7 @@ const auth = require('./auth');
 const topics = require('./topics');
 const { createBroker } = require('./broker/server');
 const brokerClient = require('./broker/client');
+const emqx = require('./emqx-bridge');
 
 const HTTP_PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
 const BROKER_PORT = process.env.BROKER_PORT ? Number(process.env.BROKER_PORT) : 1883;
@@ -131,6 +132,21 @@ async function publicarComando(etiquetaId) {
   backendMqtt.publish(topics.comando(etiquetaId), payload, { retain: true, qos: 1 }, () => {
     console.log(`[backend] comando ${updateId} (v${payload.version}) confirmado como entregue ao broker para ${etiquetaId}`);
   });
+
+  // Ponte para a etiqueta física no EMQX (texto puro, retained). Nunca pode
+  // quebrar a resposta HTTP — publicarNaEtiqueta já captura erros, mas o
+  // try/catch aqui garante isso mesmo se algo mudar lá dentro.
+  try {
+    emqx.publicarNaEtiqueta({
+      id: etiquetaId,
+      codigo: payload.codigo,
+      descricao: payload.descricao,
+      localizacao: payload.localizacao,
+      status: payload.status,
+    });
+  } catch (err) {
+    console.error('[emqx] erro inesperado na ponte:', err && err.message);
+  }
   return updateId;
 }
 
@@ -386,6 +402,7 @@ async function iniciar() {
   await garantirUsuarioAdmin();
   broker.listen(BROKER_PORT);
   conectarBackendMqtt();
+  emqx.iniciarPonte();
   server.listen(HTTP_PORT, () => {
     console.log(`[http] painel ALCABILL em http://localhost:${HTTP_PORT}`);
     console.log('Se ainda não criou um usuário, rode: npm run seed');

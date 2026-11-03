@@ -235,6 +235,27 @@ aparecer — não deixar isso pra você descobrir sozinho depois.
   produção — nesse ponto, um broker separado (item 3 da migração acima)
   já resolve isso e escala melhor.
 
+## Ponte para a etiqueta física (EMQX)
+
+Além do mini-broker interno (usado só pelo simulador), o painel publica o
+estado de cada etiqueta no EMQX Cloud, onde a placa física (ESP32) está
+conectada. Sempre que uma etiqueta é criada, editada ou reenviada, o painel
+publica em `alcabill/<dispositivo>/dados` (QoS 1, retain) um texto puro no
+formato `codigo|descricao|localizacao|status` — sem acentos e com o status
+em maiúsculas, ex.: `CD-JE9410|MOLA PRATO|01 04 H 03|BAIXO`.
+
+Variáveis de ambiente (no Render: Environment):
+
+| Variável | Exemplo | Para quê |
+|---|---|---|
+| `MQTT_URL` | `mqtts://xxxx.ala.us-east-1.emqxsl.com:8883` | endereço do EMQX (sem ela a ponte fica desativada) |
+| `MQTT_USER` | `painel` | usuário do EMQX |
+| `MQTT_PASS` | `********` | senha do EMQX (nunca aparece nos logs) |
+| `MAPA_ETIQUETAS` | `ALC-000001=etiqueta01,ALC-000002=etiqueta02` | qual etiqueta do painel vai para qual placa |
+
+Etiquetas sem entrada no `MAPA_ETIQUETAS` não são publicadas (só aparece um
+aviso no log). Testes da montagem do texto: `npm test`.
+
 ## Estrutura do projeto
 
 ```
