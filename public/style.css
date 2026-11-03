@@ -35,7 +35,7 @@
   --marca-hover: rgba(245, 184, 0, .1);
   --anel-foco: 0 0 0 2px var(--marca);
   --vidro-blur: blur(14px) saturate(140%);
-  --topo-vidro: rgba(32, 32, 32, .35); /* topo translúcido: o brilho do fundo continua por trás */
+  --topo-vidro: rgba(32,32,32,.18); /* topo translúcido: o brilho do fundo continua por trás */
   --topo-solido: rgba(32, 32, 32, .92); /* fallback sem backdrop-filter */
   --brilhos-fundo:
     radial-gradient(60vmax 40vmax at 15% 10%, rgba(245, 184, 0, .144), transparent 60%),
