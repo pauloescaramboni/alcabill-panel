@@ -16,6 +16,7 @@
   --marca: #f5b800;
   --marca-viva: #fcc419;
   --marca-contorno: rgba(245, 184, 0, .45);
+  --marca-nome: #f9c300;
   --verde: #3ddc68;
   --vermelho: #fca5a5;
   --raio-bloco: 18px;
@@ -54,8 +55,11 @@ button, input, select { font: inherit; color: inherit; }
   border-bottom: 3px solid var(--marca);
 }
 .topo .marca-topo { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.topo .marca-topo img { height: 40px; display: block; }
-.topo h1 { font-size: 26px; font-weight: 800; letter-spacing: .02em; margin: 0; color: var(--texto); }
+.topo h1 {
+  font-family: "Jost", "Futura", "Century Gothic", sans-serif;
+  font-size: 28px; font-weight: 400; letter-spacing: .08em; line-height: 1.1;
+  margin: 0; color: var(--marca-nome); text-shadow: none;
+}
 .acoes-topo { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .acoes-topo .meta { font-size: 14px; color: var(--texto-2); font-weight: 600; }
 .topo button {
@@ -216,7 +220,7 @@ select option { background: var(--superficie); color: var(--texto); }
 }
 
 @media (max-width: 380px) {
-  .topo h1 { font-size: 22px; }
+  .topo h1 { font-size: 24px; }
   .resumo-item b { font-size: 26px; }
   .resumo-item span { font-size: 13px; }
 }
