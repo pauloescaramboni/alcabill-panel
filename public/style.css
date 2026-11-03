@@ -62,7 +62,7 @@ button, input, select { font: inherit; color: inherit; }
   -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%);
   border: 0; box-shadow: none;
   display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px 12px;
-  position: sticky; top: 0; z-index: 5;
+  position: relative; z-index: 5;
 }
 .topo .marca-topo { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .topo h1 {
