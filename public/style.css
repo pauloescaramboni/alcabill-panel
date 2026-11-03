@@ -58,7 +58,7 @@ button, input, select { font: inherit; color: inherit; }
 .topo {
   background: transparent; padding: 14px 16px;
   border: 0; box-shadow: none;
-  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px 12px;
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: nowrap; gap: 10px 12px;
   position: relative; z-index: 5;
 }
 .topo .marca-topo { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -67,16 +67,43 @@ button, input, select { font: inherit; color: inherit; }
   font-size: 28px; font-weight: 400; letter-spacing: .08em; line-height: 1.1;
   margin: 0; color: var(--marca-nome); text-shadow: none;
 }
-.acoes-topo { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-.acoes-topo .meta { font-size: 14px; color: var(--texto-2); font-weight: 600; }
-.topo button {
-  background: var(--vidro); border: 0; color: var(--texto);
-  -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur); box-shadow: var(--vidro-realce);
-  min-height: 40px; padding: 9.5px 15.5px; border-radius: var(--raio-campo); font-size: 14px; font-weight: 600;
-  cursor: pointer; transition: background-color .15s ease, box-shadow .15s ease;
+.topo .marca-topo { flex: 0 0 auto; }
+.acoes-topo { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; }
+.acoes-topo .usuario-topo {
+  font-size: 14px; font-weight: 600; color: var(--texto-2);
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.topo button:hover { background-color: var(--marca-hover); }
-.topo button:focus-visible { outline: none; box-shadow: var(--vidro-realce), var(--anel-foco); }
+/* dock de vidro escuro em pílula */
+.dock-topo {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 4px; padding: 5px;
+  border: 0; border-radius: 999px; background: rgba(32,32,32,.55);
+  -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: inset 0 1px 0 rgba(214,214,214,.08), 0 10px 30px rgba(0,0,0,.35);
+}
+.dock-topo .botao-icone {
+  width: 44px; height: 44px; padding: 0; margin: 0; border: 0; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  background: transparent; color: var(--texto); cursor: pointer;
+  transition: background-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.dock-topo .botao-icone svg { width: 22px; height: 22px; display: block; }
+.dock-topo .botao-icone:hover,
+.dock-topo .botao-icone:focus-visible { background: rgba(214,214,214,.10); }
+.dock-topo .botao-icone:active { background: rgba(214,214,214,.18); }
+.dock-topo .botao-icone:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.dock-topo .botao-sair { color: var(--texto-2); }
+.dock-topo .botao-sair:hover { color: #fca5a5; }
+/* Nome + "Administrador" + pílula só cabem lado a lado a partir de ~460px.
+   Abaixo disso o topo segue numa linha só: o papel desce para baixo do nome
+   e a pílula fica à direita, centralizada verticalmente. */
+:has(> .topo) { container-type: inline-size; }
+@container (max-width: 460px) {
+  .topo { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 0; align-items: center; }
+  .acoes-topo { display: contents; }
+  .topo .marca-topo { grid-column: 1; grid-row: 1; align-self: end; }
+  .acoes-topo .usuario-topo { grid-column: 1; grid-row: 2; align-self: start; font-size: 13px; margin-top: 1px; }
+  .dock-topo { grid-column: 2; grid-row: 1 / span 2; }
+}
 
 .container { max-width: 720px; margin: 0 auto; padding: 16px; }
 
@@ -227,7 +254,8 @@ select option { background: var(--superficie); color: var(--texto); }
 /* ---------- fallback sem backdrop-filter: vidro vira fundo translúcido liso ---------- */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .cartao-login, input, select, .resumo-item, .cartao-etiqueta, .modal,
-  .botao.secundario, .topo button { background-color: var(--vidro-solido); }
+  .botao.secundario { background-color: var(--vidro-solido); }
+  .dock-topo { background-color: rgba(32,32,32,.92); }
 }
 
 @media (max-width: 380px) {

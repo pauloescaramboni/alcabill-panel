@@ -31,10 +31,18 @@
       <h1>ALCABILL</h1>
     </div>
     <div class="acoes-topo">
-      <span class="meta" id="usuario-nome" style="margin-right:4px"></span>
-      <button id="btn-usuarios" class="oculto">Usuários</button>
-      <button id="btn-trocar-senha">Trocar senha</button>
-      <button id="btn-logout">Sair</button>
+      <span class="meta usuario-topo" id="usuario-nome"></span>
+      <nav class="dock-topo" aria-label="Ações da conta">
+        <button type="button" id="btn-usuarios" class="botao-icone oculto" aria-label="Usuários" title="Usuários">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="12" cy="7.5" r="4.25"/><path d="M4 21a8 7.25 0 0 1 16 0z"/></svg>
+        </button>
+        <button type="button" id="btn-trocar-senha" class="botao-icone" aria-label="Trocar senha" title="Trocar senha">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M10.5 9.6V6.75a4.25 4.25 0 0 0-8.5 0V8.5"/><path fill="currentColor" fill-rule="evenodd" d="M14 8a7 7 0 1 1 0 14a7 7 0 1 1 0-14zM13 12.6a1 1 0 0 1 2 0v4.8a1 1 0 0 1-2 0z"/></svg>
+        </button>
+        <button type="button" id="btn-logout" class="botao-icone botao-sair" aria-label="Sair" title="Sair">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M8.5 6.4a7.25 7.25 0 1 0 7 0"/><path d="M12 3.25v8"/></svg>
+        </button>
+      </nav>
     </div>
   </div>
 
