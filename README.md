@@ -77,7 +77,8 @@ da telemetria), `--cair-apos=<segundos>`, `--porta=`, `--host=`.
 - Login/logout com sessão via cookie (`scrypt` para hash de senha).
 - Cadastro de produtos e de etiquetas (com numeração serial automática
   `ALC-000001`, `ALC-000002`, ...).
-- Edição de quantidade/localização/status de uma etiqueta, com **histórico**
+- Edição de quantidade/localização/status de uma etiqueta (status de estoque:
+  `ok` / `baixo` / `falta`, exibidos como OK / Baixo / Falta), com **histórico**
   de cada alteração (campo, valor antigo, valor novo, usuário, quando).
 - Publicação automática de um "comando" (retido, QoS1) toda vez que algo
   muda — e reenvio manual via botão "Reenviar atualização".

@@ -21,15 +21,15 @@ teste('exemplo da placa', () => {
 
 teste('remove acentos', () => {
   assert.equal(
-    montarPayload({ codigo: 'X1', descricao: 'Pião Ação Çedilha', localizacao: 'Corredor Á', status: 'manutenção' }),
-    'X1|Piao Acao Cedilha|Corredor A|MANUTENCAO'
+    montarPayload({ codigo: 'X1', descricao: 'Pião Ação Çedilha', localizacao: 'Corredor Á', status: 'baixo' }),
+    'X1|Piao Acao Cedilha|Corredor A|BAIXO'
   );
 });
 
 teste('troca | e quebras de linha por espaço e colapsa espaços', () => {
   assert.equal(
-    montarPayload({ codigo: ' A|B ', descricao: 'linha1\nlinha2\r\nlinha3', localizacao: 'x   y\t z', status: 'ativo' }),
-    'A B|linha1 linha2 linha3|x y z|ATIVO'
+    montarPayload({ codigo: ' A|B ', descricao: 'linha1\nlinha2\r\nlinha3', localizacao: 'x   y\t z', status: 'ok' }),
+    'A B|linha1 linha2 linha3|x y z|OK'
   );
 });
 
@@ -40,11 +40,11 @@ teste('null/undefined viram vazio', () => {
 });
 
 teste('status minúsculo vira maiúsculo', () => {
-  assert.equal(montarPayload({ codigo: 'C', descricao: 'D', localizacao: 'L', status: 'inativo' }), 'C|D|L|INATIVO');
+  assert.equal(montarPayload({ codigo: 'C', descricao: 'D', localizacao: 'L', status: 'falta' }), 'C|D|L|FALTA');
 });
 
 teste('números são convertidos para texto', () => {
-  assert.equal(montarPayload({ codigo: 123, descricao: 'D', localizacao: 0, status: 'ativo' }), '123|D|0|ATIVO');
+  assert.equal(montarPayload({ codigo: 123, descricao: 'D', localizacao: 0, status: 'ok' }), '123|D|0|OK');
 });
 
 teste('parseMapa básico', () => {

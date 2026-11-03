@@ -89,6 +89,9 @@ input:focus, select:focus {
 .status-dot.on { background: var(--verde); box-shadow: 0 0 0 3px rgba(46,125,50,.15); }
 .status-dot.off { background: #bbb; }
 .badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--marca-clara); color: var(--marca-escura); }
+.badge.status-ok { background: #e8f5e9; color: var(--verde); }
+.badge.status-baixo { background: var(--marca-clara); color: var(--marca-escura); }
+.badge.status-falta { background: #ffebee; color: var(--vermelho); }
 .grade-info { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-top: 10px; font-size: 13px; }
 .grade-info b { display: block; font-size: 15px; }
 

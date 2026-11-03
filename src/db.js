@@ -106,7 +106,7 @@ async function inicializarEsquema() {
       produto_id INTEGER REFERENCES produtos(id),
       quantidade INTEGER NOT NULL DEFAULT 0,
       localizacao TEXT DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'ativo',
+      status TEXT NOT NULL DEFAULT 'ok',
       version INTEGER NOT NULL DEFAULT 0,
       bateria_v REAL,
       rssi INTEGER,
@@ -135,6 +135,17 @@ async function inicializarEsquema() {
       criado_em TEXT NOT NULL,
       confirmado_em TEXT
     );
+  `);
+
+  // Migração dos status antigos (ativo/manutenção/inativo) para os status de
+  // estoque (ok/baixo/falta). O CREATE TABLE IF NOT EXISTS acima não altera
+  // uma tabela que já existe em produção, então o default e os dados antigos
+  // são ajustados aqui. Tudo é idempotente: rodar de novo não muda nada.
+  await exec(`
+    ALTER TABLE etiquetas ALTER COLUMN status SET DEFAULT 'ok';
+    UPDATE etiquetas SET status = 'ok' WHERE status = 'ativo';
+    UPDATE etiquetas SET status = 'falta' WHERE status = 'inativo';
+    UPDATE etiquetas SET status = 'baixo' WHERE status IN ('manutenção', 'manutencao');
   `);
 }
 

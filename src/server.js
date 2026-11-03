@@ -178,6 +178,9 @@ function readBody(req) {
   });
 }
 
+// Status de estoque aceitos para uma etiqueta (cabem na caixinha do e-paper).
+const STATUS_VALIDOS = ['ok', 'baixo', 'falta'];
+
 function sendJson(res, statusCode, obj, extraHeaders = {}) {
   const body = JSON.stringify(obj);
   res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8', ...extraHeaders });
@@ -320,7 +323,7 @@ const server = http.createServer(async (req, res) => {
       const id = await proximoSerial();
       await db.prepare(`
         INSERT INTO etiquetas (id, produto_id, localizacao, status, version, online, criado_em)
-        VALUES (?, ?, ?, 'ativo', 1, 0, ?)
+        VALUES (?, ?, ?, 'ok', 1, 0, ?)
       `).run(id, produto_id || null, localizacao, new Date().toISOString());
       await registrarHistorico(id, 'criação', null, `etiqueta ${id} criada`, usuario.nome);
       await publicarComando(id);
@@ -338,6 +341,9 @@ const server = http.createServer(async (req, res) => {
 
       if (!sub && req.method === 'PUT') {
         const alteracoes = await readBody(req);
+        if (alteracoes.status !== undefined && !STATUS_VALIDOS.includes(alteracoes.status)) {
+          return sendJson(res, 400, { erro: `status inválido: use ${STATUS_VALIDOS.join(', ')}` });
+        }
         const campos = ['localizacao', 'status'];
         let mudou = false;
         for (const campo of campos) {

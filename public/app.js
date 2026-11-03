@@ -147,6 +147,12 @@ async function carregarTudo() {
   renderizarLista();
 }
 
+// Status de estoque da etiqueta (valor gravado → rótulo visível).
+const ROTULOS_STATUS = { ok: 'OK', baixo: 'Baixo', falta: 'Falta' };
+function rotuloStatus(s) {
+  return ROTULOS_STATUS[s] || s;
+}
+
 function tempoRelativo(iso) {
   if (!iso) return 'nunca';
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -207,7 +213,7 @@ function cartaoHtml(e) {
         <div class="produto-nome">${produto}</div>
         <div class="meta"><span class="status-dot ${e.online ? 'on' : 'off'}"></span>${e.online ? 'online' : 'offline'} · última comunicação ${tempoRelativo(e.ultima_comunicacao)}</div>
       </div>
-      <span class="badge">${e.status}</span>
+      <span class="badge status-${e.status}">${rotuloStatus(e.status)}</span>
     </div>
     <div class="grade-info">
       <div>Localização<b>${e.localizacao || '—'}</b></div>
@@ -229,7 +235,7 @@ function alternarEdicao(id) {
     <input type="text" id="loc-${id}" value="${e.localizacao || ''}" />
     <label>Status</label>
     <select id="sts-${id}">
-      ${['ativo', 'manutenção', 'inativo'].map((s) => `<option value="${s}" ${s === e.status ? 'selected' : ''}>${s}</option>`).join('')}
+      ${Object.keys(ROTULOS_STATUS).map((s) => `<option value="${s}" ${s === e.status ? 'selected' : ''}>${ROTULOS_STATUS[s]}</option>`).join('')}
     </select>
     <div class="linha-botoes">
       <button class="botao pequeno" data-acao="salvar">Salvar</button>
