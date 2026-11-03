@@ -14,9 +14,17 @@ antes de seguir para o hardware. É a parte mais importante deste documento.
 ## Requisitos
 
 - Node.js **18 ou mais recente**.
-- Um banco **Postgres** acessível (local ou remoto) e a variável de
-  ambiente `DATABASE_URL` apontando pra ele — ex.:
-  `postgres://usuario:senha@host:5432/nome_do_banco`.
+- Um banco **Postgres** acessível (local ou remoto), configurado de uma
+  destas duas formas:
+  - **Variáveis PG\*** (formato do `.env` que o Neon gera): `PGHOST`,
+    `PGUSER`, `PGPASSWORD`, `PGDATABASE` (e, se vierem, `PGPORT` etc.).
+    Quando `PGHOST` está definida, elas têm **prioridade** e a
+    `DATABASE_URL` é ignorada — útil no Render, onde pode ter sobrado uma
+    `DATABASE_URL` antiga apontando pra um banco que não existe mais.
+  - **`DATABASE_URL`** com a connection string completa — ex.:
+    `postgres://usuario:senha@host:5432/nome_do_banco`.
+  - Em ambos os casos o SSL é ligado automaticamente (sem validar a cadeia
+    do certificado) quando o host não é `localhost`/`127.0.0.1`.
 - Rodar `npm install` uma vez (instala só o driver oficial `pg` — o resto
   do projeto continua sem dependências externas; veja a seção
   ["Por que existe um simulador..."](#por-que-existe-um-simulador-e-por-que-ele-não-é-mqtt-de-verdade)

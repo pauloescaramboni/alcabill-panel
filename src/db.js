@@ -20,21 +20,38 @@
 
 const { Pool } = require('pg');
 
+// Duas formas de configurar a conexão:
+//
+// 1) Variáveis PG* (PGHOST, PGUSER, PGPASSWORD, PGDATABASE, PGPORT...) —
+//    é o formato do .env que o Neon gera. Têm PRIORIDADE: quando PGHOST está
+//    definida, DATABASE_URL é ignorada (no Render ainda pode existir uma
+//    DATABASE_URL antiga apontando para o banco apagado). Nesse caso o Pool
+//    é criado sem connectionString e o próprio `pg` lê as PG* do ambiente.
+// 2) DATABASE_URL — connection string completa (comportamento original).
+//
+// Bancos gerenciados (Render, Neon, Heroku, etc.) normalmente exigem SSL,
+// mas com um certificado que a cadeia de CAs padrão do Node pode não
+// reconhecer — por isso `rejectUnauthorized: false` (aceita a conexão
+// criptografada sem validar a cadeia do certificado). Para desenvolvimento
+// local (localhost/127.0.0.1), SSL fica desligado. O `ssl` é sempre passado
+// explicitamente, então ele prevalece sobre um eventual PGSSLMODE no
+// ambiente (o `pg` só consulta PGSSLMODE quando a opção `ssl` não é passada).
+const RE_LOCAL = /(localhost|127\.0\.0\.1)/;
+const pgHost = process.env.PGHOST;
 const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  console.error('[db] ATENÇÃO: variável de ambiente DATABASE_URL não definida. Configure-a com a connection string do Postgres antes de iniciar.');
-}
 
-// Bancos gerenciados (Render, Heroku, etc.) normalmente exigem SSL, mas com
-// um certificado que a cadeia de CAs padrão do Node não reconhece — por
-// isso `rejectUnauthorized: false` (aceita a conexão criptografada sem
-// validar a cadeia do certificado). Para desenvolvimento local
-// (localhost/127.0.0.1), SSL fica desligado.
-const ehLocal = connectionString && /(localhost|127\.0\.0\.1)/.test(connectionString);
-const pool = new Pool({
-  connectionString,
-  ssl: connectionString && !ehLocal ? { rejectUnauthorized: false } : false,
-});
+let configPool;
+if (pgHost) {
+  console.log(`[db] usando variáveis PG* (host: ${pgHost})`);
+  configPool = { ssl: RE_LOCAL.test(pgHost) ? false : { rejectUnauthorized: false } };
+} else if (connectionString) {
+  const ehLocal = RE_LOCAL.test(connectionString);
+  configPool = { connectionString, ssl: ehLocal ? false : { rejectUnauthorized: false } };
+} else {
+  console.error('[db] ATENÇÃO: nenhuma configuração de banco encontrada. Defina as variáveis PG* do Neon (PGHOST, PGUSER, PGPASSWORD, PGDATABASE) ou a DATABASE_URL com a connection string do Postgres antes de iniciar.');
+  configPool = {};
+}
+const pool = new Pool(configPool);
 
 pool.on('error', (err) => {
   // Erros em clientes ociosos do pool não devem derrubar o processo inteiro.
