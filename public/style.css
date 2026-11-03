@@ -6,13 +6,17 @@
    são "vidro fosco" sobre brilhos amarelos difusos e fixos no fundo. */
 :root {
   color-scheme: dark;
-  --fundo: #000;
-  --superficie: #0d0d0c;
-  --superficie-2: #151513;
-  --linha: #2a2a28;
-  --linha-forte: #3a3a37;
-  --texto: #f5f5f2;
-  --texto-2: #a9a7a0;
+  /* paleta: #202020 (fundo), #333533 (cinza esverdeado), #D6D6D6 (texto) */
+  --fundo: #202020;
+  --fundo-veu: rgba(32, 32, 32, .78); /* fundo do modal */
+  --superficie: #2a2b2a;
+  --superficie-2: #333533;
+  --linha: #333533;
+  --linha-forte: #4a4c4a;
+  --texto: #d6d6d6;
+  --texto-2: #9c9e9c;
+  --texto-apagado: #7d7f7d; /* placeholder, ponto offline */
+  --texto-sobre-marca: #202020;
   --marca: #f5b800;
   --marca-viva: #fcc419;
   --marca-contorno: rgba(245, 184, 0, .45);
@@ -22,18 +26,21 @@
   --raio-bloco: 18px;
   --raio-campo: 14px;
   /* vidro fosco */
-  --vidro: rgba(255, 255, 255, .06);
-  --vidro-campo: rgba(255, 255, 255, .045);
-  --vidro-solido: rgba(255, 255, 255, .08); /* fallback sem backdrop-filter */
-  --vidro-borda: 1px solid rgba(255, 255, 255, .12);
-  --vidro-realce: inset 0 1px 0 rgba(255, 255, 255, .08);
+  --vidro: rgba(214, 214, 214, .06);
+  --vidro-campo: rgba(214, 214, 214, .045);
+  --vidro-solido: #2a2b2a; /* fallback sem backdrop-filter */
+  --vidro-borda: 1px solid rgba(214, 214, 214, .14);
+  --vidro-realce: inset 0 1px 0 rgba(214, 214, 214, .08);
+  --sombra-bloco: 0 20px 50px rgba(0, 0, 0, .45);
+  --marca-hover: rgba(245, 184, 0, .1);
+  --marca-foco: rgba(245, 184, 0, .22);
   --vidro-blur: blur(14px) saturate(140%);
   --brilhos-fundo:
-    radial-gradient(60vmax 40vmax at 15% 10%, rgba(245, 184, 0, .18), transparent 60%),
-    radial-gradient(50vmax 35vmax at 90% 85%, rgba(245, 184, 0, .12), transparent 60%);
+    radial-gradient(60vmax 40vmax at 15% 10%, rgba(245, 184, 0, .144), transparent 60%),
+    radial-gradient(50vmax 35vmax at 90% 85%, rgba(245, 184, 0, .096), transparent 60%);
   --brilhos-login:
-    radial-gradient(45vmax 32vmax at 50% 40%, rgba(245, 184, 0, .2), transparent 60%),
-    radial-gradient(40vmax 28vmax at 85% 95%, rgba(245, 184, 0, .08), transparent 60%);
+    radial-gradient(45vmax 32vmax at 50% 40%, rgba(245, 184, 0, .16), transparent 60%),
+    radial-gradient(40vmax 28vmax at 85% 95%, rgba(245, 184, 0, .064), transparent 60%);
   font-family: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   font-weight: 500;
 }
@@ -68,7 +75,7 @@ button, input, select { font: inherit; color: inherit; }
   min-height: 40px; padding: 8px 14px; border-radius: var(--raio-campo); font-size: 14px; font-weight: 600;
   cursor: pointer; transition: border-color .15s ease, background-color .15s ease;
 }
-.topo button:hover { border-color: var(--marca); background-color: rgba(245, 184, 0, .1); }
+.topo button:hover { border-color: var(--marca); background-color: var(--marca-hover); }
 
 .container { max-width: 720px; margin: 0 auto; padding: 16px; }
 
@@ -79,7 +86,7 @@ button, input, select { font: inherit; color: inherit; }
 .cartao-login {
   background: var(--vidro); border: var(--vidro-borda); border-radius: 22px;
   -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur);
-  box-shadow: var(--vidro-realce), 0 20px 50px rgba(0, 0, 0, .45);
+  box-shadow: var(--vidro-realce), var(--sombra-bloco);
   padding: 28px 22px; width: 100%; max-width: 380px;
   animation: login-entrar .3s ease;
 }
@@ -101,8 +108,8 @@ input, select {
 }
 input[type=search] { -webkit-appearance: none; appearance: none; }
 input[type=search]::-webkit-search-decoration { -webkit-appearance: none; }
-input::placeholder { color: #8a8880; }
-input:focus, select:focus { outline: none; border-color: var(--marca); box-shadow: var(--vidro-realce), 0 0 0 3px rgba(245, 184, 0, .22); }
+input::placeholder { color: var(--texto-apagado); }
+input:focus, select:focus { outline: none; border-color: var(--marca); box-shadow: var(--vidro-realce), 0 0 0 3px var(--marca-foco); }
 input:focus-visible, select:focus-visible { outline: 2px solid var(--marca); outline-offset: 1px; }
 select {
   appearance: none; -webkit-appearance: none; padding-right: 40px; cursor: pointer;
@@ -114,7 +121,7 @@ select option { background: var(--superficie); color: var(--texto); }
 /* ---------- botões ---------- */
 .botao {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  background: var(--marca); color: #000; font-weight: 700; border: 1.5px solid var(--marca);
+  background: var(--marca); color: var(--texto-sobre-marca); font-weight: 700; border: 1.5px solid var(--marca);
   min-height: 48px; padding: 10px 18px; border-radius: var(--raio-campo); font-size: 16px;
   cursor: pointer; margin-top: 12px;
   transition: background-color .15s ease, border-color .15s ease, transform .05s ease;
@@ -125,7 +132,7 @@ select option { background: var(--superficie); color: var(--texto); }
   background: var(--vidro); color: var(--texto); border-color: var(--marca-contorno); font-weight: 600;
   -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur); box-shadow: var(--vidro-realce);
 }
-.botao.secundario:hover { border-color: var(--marca); background-color: rgba(245, 184, 0, .1); }
+.botao.secundario:hover { border-color: var(--marca); background-color: var(--marca-hover); }
 .botao.pequeno { min-height: 44px; padding: 8px 14px; font-size: 15px; margin-top: 0; }
 .botao:disabled { opacity: .5; cursor: not-allowed; }
 .erro { color: var(--vermelho); font-size: 14px; font-weight: 600; margin-top: 10px; }
@@ -151,7 +158,7 @@ select option { background: var(--superficie); color: var(--texto); }
 .resumo-item span { font-size: 14px; font-weight: 600; color: var(--texto-2); }
 .resumo-item.total b { color: var(--marca); }
 .resumo-item.online b { color: var(--verde); }
-.resumo-item.offline b { color: #d6d4cd; }
+.resumo-item.offline b { color: var(--texto); }
 
 /* ---------- cartão de etiqueta ---------- */
 .cartao-etiqueta {
@@ -166,10 +173,10 @@ select option { background: var(--superficie); color: var(--texto); }
 .meta { font-size: 14px; color: var(--texto-2); }
 .status-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }
 .status-dot.on { background: var(--verde); box-shadow: 0 0 0 3px rgba(61, 220, 104, .18); }
-.status-dot.off { background: #6f6d67; }
+.status-dot.off { background: var(--texto-apagado); }
 .badge {
   flex: none; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
-  padding: 5px 12px; border-radius: 999px; background: #2a2a28; color: var(--texto);
+  padding: 5px 12px; border-radius: 999px; background: var(--superficie-2); color: var(--texto);
 }
 .badge.status-ok { background: #14532d; color: #86efac; }
 .badge.status-baixo { background: #4a2c06; color: #fbbf24; }
@@ -195,7 +202,7 @@ select option { background: var(--superficie); color: var(--texto); }
 @keyframes fundo-entrar { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modal-entrar { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 .modal-fundo {
-  position: fixed; inset: 0; background: rgba(0, 0, 0, .72); display: flex; align-items: flex-end; justify-content: center; z-index: 10;
+  position: fixed; inset: 0; background: var(--fundo-veu); display: flex; align-items: flex-end; justify-content: center; z-index: 10;
   animation: fundo-entrar .15s ease;
 }
 .modal {
