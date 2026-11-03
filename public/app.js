@@ -211,7 +211,7 @@ function cartaoHtml(e) {
       <div>
         <div class="serial">${e.id}</div>
         <div class="produto-nome">${produto}</div>
-        <div class="meta"><span class="status-dot ${e.online ? 'on' : 'off'}"></span>${e.online ? 'online' : 'offline'} · última comunicação ${tempoRelativo(e.ultima_comunicacao)}</div>
+        <div class="meta"><span class="status-dot ${e.online ? 'on' : 'off'}"></span>${e.online ? 'online' : 'offline'} · ${tempoRelativo(e.ultima_comunicacao)}</div>
       </div>
       <span class="badge status-${e.status}">${rotuloStatus(e.status)}</span>
     </div>

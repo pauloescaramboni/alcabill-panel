@@ -4,6 +4,10 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>ALCABILL — Painel</title>
+<meta name="theme-color" content="#000000" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&display=swap" />
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -16,7 +20,7 @@
     <input id="login-email" type="email" autocomplete="username" required />
     <label for="login-senha">Senha</label>
     <input id="login-senha" type="password" autocomplete="current-password" required />
-    <button class="botao" type="submit" style="width:100%">Entrar</button>
+    <button class="botao" type="submit">Entrar</button>
     <div class="erro oculto" id="login-erro"></div>
   </form>
 </div>
@@ -27,17 +31,20 @@
       <img src="/logo.png" alt="" />
       <h1>ALCABILL</h1>
     </div>
-    <div>
-      <span class="meta" id="usuario-nome" style="margin-right:10px"></span>
-      <button id="btn-usuarios" class="oculto" style="margin-right:6px">Usuários</button>
-      <button id="btn-trocar-senha" style="margin-right:6px">Trocar senha</button>
+    <div class="acoes-topo">
+      <span class="meta" id="usuario-nome" style="margin-right:4px"></span>
+      <button id="btn-usuarios" class="oculto">Usuários</button>
+      <button id="btn-trocar-senha">Trocar senha</button>
       <button id="btn-logout">Sair</button>
     </div>
   </div>
 
   <div class="container">
     <div id="resumo" class="resumo"></div>
-    <input type="text" id="busca" placeholder="Buscar por produto, código, serial ou localização..." />
+    <div class="campo-busca">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+      <input type="search" id="busca" aria-label="Buscar etiquetas" placeholder="Buscar por produto, código, serial ou localização..." />
+    </div>
     <div class="barra-acoes">
       <button class="botao pequeno" id="btn-nova-etiqueta">+ Nova etiqueta</button>
       <button class="botao pequeno secundario" id="btn-novo-produto">+ Novo produto</button>
