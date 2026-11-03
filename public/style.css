@@ -1,7 +1,9 @@
 /* ALCABILL — tema único escuro.
    Amarelo forte só onde manda o olho: botão primário, serial, total de
    etiquetas, lupa, faixa do topo e borda do cartão. Contornos secundários
-   usam o amarelo atenuado (--marca-contorno). */
+   usam o amarelo atenuado (--marca-contorno).
+   Blocos (login, campos, contadores, cartões, modais, botões secundários)
+   são "vidro fosco" sobre brilhos amarelos difusos e fixos no fundo. */
 :root {
   color-scheme: dark;
   --fundo: #000;
@@ -18,12 +20,28 @@
   --vermelho: #fca5a5;
   --raio-bloco: 18px;
   --raio-campo: 14px;
+  /* vidro fosco */
+  --vidro: rgba(255, 255, 255, .06);
+  --vidro-campo: rgba(255, 255, 255, .045);
+  --vidro-solido: rgba(255, 255, 255, .08); /* fallback sem backdrop-filter */
+  --vidro-borda: 1px solid rgba(255, 255, 255, .12);
+  --vidro-realce: inset 0 1px 0 rgba(255, 255, 255, .08);
+  --vidro-blur: blur(14px) saturate(140%);
+  --brilhos-fundo:
+    radial-gradient(60vmax 40vmax at 15% 10%, rgba(245, 184, 0, .18), transparent 60%),
+    radial-gradient(50vmax 35vmax at 90% 85%, rgba(245, 184, 0, .12), transparent 60%);
+  --brilhos-login:
+    radial-gradient(45vmax 32vmax at 50% 40%, rgba(245, 184, 0, .2), transparent 60%),
+    radial-gradient(40vmax 28vmax at 85% 95%, rgba(245, 184, 0, .08), transparent 60%);
   font-family: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   font-weight: 500;
 }
 * { box-sizing: border-box; }
 html { background: var(--fundo); }
-body { margin: 0; background: var(--fundo); color: var(--texto); line-height: 1.4; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; min-height: 100vh; color: var(--texto); line-height: 1.4; -webkit-text-size-adjust: 100%;
+  background: var(--fundo); background-image: var(--brilhos-fundo); background-attachment: fixed;
+}
 .oculto { display: none !important; }
 button, input, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
@@ -41,19 +59,23 @@ button, input, select { font: inherit; color: inherit; }
 .acoes-topo { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .acoes-topo .meta { font-size: 14px; color: var(--texto-2); font-weight: 600; }
 .topo button {
-  background: transparent; border: 1.5px solid var(--marca-contorno); color: var(--texto);
+  background: var(--vidro); border: 1.5px solid var(--marca-contorno); color: var(--texto);
+  -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur); box-shadow: var(--vidro-realce);
   min-height: 40px; padding: 8px 14px; border-radius: var(--raio-campo); font-size: 14px; font-weight: 600;
-  cursor: pointer; transition: border-color .15s ease, background .15s ease;
+  cursor: pointer; transition: border-color .15s ease, background-color .15s ease;
 }
-.topo button:hover { border-color: var(--marca); background: rgba(245, 184, 0, .08); }
+.topo button:hover { border-color: var(--marca); background-color: rgba(245, 184, 0, .1); }
 
 .container { max-width: 720px; margin: 0 auto; padding: 16px; }
 
 /* ---------- login ---------- */
-.tela-login { min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--fundo); }
+.tela-login { min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: var(--fundo); background-image: var(--brilhos-login); background-attachment: fixed; }
 @keyframes login-entrar { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .cartao-login {
-  background: var(--fundo); border: 1.5px solid #2e2e2c; border-radius: 22px;
+  background: var(--vidro); border: var(--vidro-borda); border-radius: 22px;
+  -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur);
+  box-shadow: var(--vidro-realce), 0 20px 50px rgba(0, 0, 0, .45);
   padding: 28px 22px; width: 100%; max-width: 380px;
   animation: login-entrar .3s ease;
 }
@@ -67,15 +89,16 @@ button, input, select { font: inherit; color: inherit; }
 label { display: block; font-size: 14px; font-weight: 600; color: var(--texto-2); margin: 12px 0 6px; }
 input, select {
   width: 100%; min-height: 48px; padding: 10px 14px;
-  background: var(--fundo); color: var(--texto);
-  border: 1.5px solid var(--linha-forte); border-radius: var(--raio-campo);
+  background-color: var(--vidro-campo); color: var(--texto);
+  border: var(--vidro-borda); border-radius: var(--raio-campo);
+  -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur); box-shadow: var(--vidro-realce);
   font-size: 16px; font-weight: 500;
   transition: border-color .15s ease, box-shadow .15s ease;
 }
 input[type=search] { -webkit-appearance: none; appearance: none; }
 input[type=search]::-webkit-search-decoration { -webkit-appearance: none; }
-input::placeholder { color: #6f6d67; }
-input:focus, select:focus { outline: none; border-color: var(--marca); box-shadow: 0 0 0 3px rgba(245, 184, 0, .22); }
+input::placeholder { color: #8a8880; }
+input:focus, select:focus { outline: none; border-color: var(--marca); box-shadow: var(--vidro-realce), 0 0 0 3px rgba(245, 184, 0, .22); }
 input:focus-visible, select:focus-visible { outline: 2px solid var(--marca); outline-offset: 1px; }
 select {
   appearance: none; -webkit-appearance: none; padding-right: 40px; cursor: pointer;
@@ -90,20 +113,23 @@ select option { background: var(--superficie); color: var(--texto); }
   background: var(--marca); color: #000; font-weight: 700; border: 1.5px solid var(--marca);
   min-height: 48px; padding: 10px 18px; border-radius: var(--raio-campo); font-size: 16px;
   cursor: pointer; margin-top: 12px;
-  transition: background .15s ease, border-color .15s ease, transform .05s ease;
+  transition: background-color .15s ease, border-color .15s ease, transform .05s ease;
 }
 .botao:hover { background: var(--marca-viva); border-color: var(--marca-viva); }
 .botao:active { transform: translateY(1px); }
-.botao.secundario { background: var(--fundo); color: var(--texto); border-color: var(--marca-contorno); font-weight: 600; }
-.botao.secundario:hover { border-color: var(--marca); background: rgba(245, 184, 0, .08); }
+.botao.secundario {
+  background: var(--vidro); color: var(--texto); border-color: var(--marca-contorno); font-weight: 600;
+  -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur); box-shadow: var(--vidro-realce);
+}
+.botao.secundario:hover { border-color: var(--marca); background-color: rgba(245, 184, 0, .1); }
 .botao.pequeno { min-height: 44px; padding: 8px 14px; font-size: 15px; margin-top: 0; }
 .botao:disabled { opacity: .5; cursor: not-allowed; }
 .erro { color: var(--vermelho); font-size: 14px; font-weight: 600; margin-top: 10px; }
 
 /* ---------- busca ---------- */
 .campo-busca { position: relative; margin: 14px 0 0; }
-.campo-busca svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: var(--marca); pointer-events: none; }
-#busca { padding-left: 44px; border-color: var(--marca-contorno); min-height: 50px; }
+.campo-busca svg { position: absolute; z-index: 1; left: 14px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: var(--marca); pointer-events: none; }
+#busca { padding-left: 44px; border: 1.5px solid var(--marca-contorno); min-height: 50px; }
 #busca:focus { border-color: var(--marca); }
 
 .barra-acoes { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; align-items: center; }
@@ -113,7 +139,8 @@ select option { background: var(--superficie); color: var(--texto); }
 /* ---------- contadores ---------- */
 .resumo { display: flex; gap: 10px; margin: 4px 0 14px; }
 .resumo-item {
-  flex: 1; min-width: 0; background: var(--superficie); border: 1.5px solid var(--linha);
+  flex: 1; min-width: 0; background: var(--vidro); border: var(--vidro-borda); box-shadow: var(--vidro-realce);
+  -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur);
   border-radius: var(--raio-bloco); padding: 14px 10px; text-align: center;
 }
 .resumo-item b { display: block; font-size: 32px; font-weight: 800; line-height: 1.1; color: var(--texto); font-variant-numeric: tabular-nums; }
@@ -124,7 +151,8 @@ select option { background: var(--superficie); color: var(--texto); }
 
 /* ---------- cartão de etiqueta ---------- */
 .cartao-etiqueta {
-  background: var(--superficie); border: 2px solid var(--marca); border-radius: var(--raio-bloco);
+  background: var(--vidro); border: 2px solid var(--marca); border-radius: var(--raio-bloco);
+  -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur); box-shadow: var(--vidro-realce);
   padding: 16px; margin-bottom: 12px;
 }
 .linha-topo-cartao { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; cursor: pointer; }
@@ -167,18 +195,25 @@ select option { background: var(--superficie); color: var(--texto); }
   animation: fundo-entrar .15s ease;
 }
 .modal {
-  background: var(--superficie); color: var(--texto); width: 100%; max-width: 480px;
-  border: 1.5px solid var(--linha); border-bottom: 0; border-radius: 22px 22px 0 0;
+  background: var(--vidro); color: var(--texto); width: 100%; max-width: 480px;
+  -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur); box-shadow: var(--vidro-realce);
+  border: var(--vidro-borda); border-bottom: 0; border-radius: 22px 22px 0 0;
   padding: 22px 18px calc(22px + env(safe-area-inset-bottom, 0px));
   max-height: 85vh; overflow-y: auto; animation: modal-entrar .18s ease;
 }
 .modal h3 { font-size: 20px; font-weight: 800; margin: 0 0 6px; }
 @media (min-width: 560px) {
   .modal-fundo { align-items: center; }
-  .modal { border-radius: 22px; border-bottom: 1.5px solid var(--linha); padding-bottom: 22px; }
+  .modal { border-radius: 22px; border-bottom: var(--vidro-borda); padding-bottom: 22px; }
 }
 
 .vazio { text-align: center; color: var(--texto-2); padding: 34px 12px; font-size: 15px; border: 1.5px dashed var(--linha); border-radius: var(--raio-bloco); }
+
+/* ---------- fallback sem backdrop-filter: vidro vira fundo translúcido liso ---------- */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .cartao-login, input, select, .resumo-item, .cartao-etiqueta, .modal,
+  .botao.secundario, .topo button { background-color: var(--vidro-solido); }
+}
 
 @media (max-width: 380px) {
   .topo h1 { font-size: 22px; }
