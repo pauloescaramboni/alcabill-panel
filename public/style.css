@@ -1,6 +1,6 @@
 /* ALCABILL — tema único escuro.
    Amarelo forte só onde manda o olho: botão primário, serial, total de
-   etiquetas, lupa e borda do cartão de etiqueta.
+   etiquetas e lupa.
    Blocos (login, campos, contadores, cartões, modais, botões secundários)
    são "vidro fosco" sem contorno sobre brilhos amarelos difusos e fixos no
    fundo; o foco aparece como anel amarelo (box-shadow). */
@@ -24,6 +24,7 @@
   --vermelho: #fca5a5;
   --raio-bloco: 18px;
   --raio-campo: 14px;
+  --raio-cartao: 22px; /* cartão de login e cartões de etiqueta */
   /* vidro fosco */
   --vidro: rgba(214, 214, 214, .085);
   --vidro-campo: rgba(214, 214, 214, .07);
@@ -83,7 +84,7 @@ button, input, select { font: inherit; color: inherit; }
   background: var(--fundo); background-image: var(--brilhos-login); background-attachment: fixed; }
 @keyframes login-entrar { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .cartao-login {
-  background: var(--vidro); border: 0; border-radius: 22px;
+  background: var(--vidro); border: 0; border-radius: var(--raio-cartao);
   -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur);
   box-shadow: var(--vidro-realce), var(--sombra-bloco);
   padding: 28px 22px; width: 100%; max-width: 380px;
@@ -162,9 +163,11 @@ select option { background: var(--superficie); color: var(--texto); }
 
 /* ---------- cartão de etiqueta ---------- */
 .cartao-etiqueta {
-  background: var(--vidro); border: 2px solid var(--marca); border-radius: var(--raio-bloco);
-  -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur); box-shadow: var(--vidro-realce);
-  padding: 16px; margin-bottom: 12px;
+  /* mesmo visual do .cartao-login */
+  background: var(--vidro); border: 0; border-radius: var(--raio-cartao);
+  -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur);
+  box-shadow: var(--vidro-realce), var(--sombra-bloco);
+  padding: 16px; margin-bottom: 14px;
 }
 .linha-topo-cartao { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; cursor: pointer; }
 .linha-topo-cartao > div { min-width: 0; }
