@@ -58,7 +58,7 @@ button, input, select { font: inherit; color: inherit; }
 .topo {
   background: transparent; padding: 14px 16px;
   border: 0; box-shadow: none;
-  display: flex; justify-content: space-between; align-items: center; flex-wrap: nowrap; gap: 10px 12px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
   position: relative; z-index: 5;
 }
 .topo .marca-topo { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -68,7 +68,7 @@ button, input, select { font: inherit; color: inherit; }
   margin: 0; color: var(--marca-nome); text-shadow: none;
 }
 .topo .marca-topo { flex: 0 0 auto; }
-.acoes-topo { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; }
+.acoes-topo { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; }
 .acoes-topo .usuario-topo {
   font-size: 14px; font-weight: 600; color: var(--texto-2);
   min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -93,17 +93,7 @@ button, input, select { font: inherit; color: inherit; }
 .dock-topo .botao-icone:focus-visible { outline: none; box-shadow: var(--anel-foco); }
 .dock-topo .botao-sair { color: var(--texto-2); }
 .dock-topo .botao-sair:hover { color: #fca5a5; }
-/* Nome + "Administrador" + pílula só cabem lado a lado a partir de ~460px.
-   Abaixo disso o topo segue numa linha só: o papel desce para baixo do nome
-   e a pílula fica à direita, centralizada verticalmente. */
-:has(> .topo) { container-type: inline-size; }
-@container (max-width: 460px) {
-  .topo { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 0; align-items: center; }
-  .acoes-topo { display: contents; }
-  .topo .marca-topo { grid-column: 1; grid-row: 1; align-self: end; }
-  .acoes-topo .usuario-topo { grid-column: 1; grid-row: 2; align-self: start; font-size: 13px; margin-top: 1px; }
-  .dock-topo { grid-column: 2; grid-row: 1 / span 2; }
-}
+/* Topo empilhado: nome, "Administrador" e, embaixo dele, a pílula. */
 
 .container { max-width: 720px; margin: 0 auto; padding: 16px; }
 
