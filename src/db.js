@@ -180,6 +180,45 @@ async function inicializarEsquema() {
     CREATE INDEX IF NOT EXISTS sessoes_expira_em_idx ON sessoes (expira_em);
     CREATE INDEX IF NOT EXISTS sessoes_usuario_id_idx ON sessoes (usuario_id);
   `);
+
+  // Placa física vinculada a cada etiqueta (o <dispositivo> do tópico
+  // alcabill/<dispositivo>/dados no EMQX). Editada pelo painel (só admin).
+  //   NULL -> nunca definida (a ponte ainda aceita MAPA_ETIQUETAS como fallback)
+  //   ''   -> desvinculada de propósito pelo painel (não publica)
+  // O índice único parcial impede duas etiquetas na mesma placa, ignorando
+  // NULL e ''. Idempotente.
+  await exec(`
+    ALTER TABLE etiquetas ADD COLUMN IF NOT EXISTS dispositivo TEXT;
+    CREATE UNIQUE INDEX IF NOT EXISTS etiquetas_dispositivo_unico
+      ON etiquetas (dispositivo) WHERE dispositivo IS NOT NULL AND dispositivo <> '';
+  `);
 }
 
-module.exports = { prepare, exec, inicializarEsquema, pool };
+// Copia o MAPA_ETIQUETAS (variável de ambiente antiga) para a coluna
+// `dispositivo`, só onde ela nunca foi definida (NULL). Não sobrescreve o que
+// foi definido pelo painel — nem um "desvincular" (''), senão a desvinculação
+// seria desfeita a cada reinício. Conflito de unicidade (placa já usada por
+// outra etiqueta) só gera log. Erros não derrubam o boot.
+async function migrarDispositivosDoMapa(mapa) {
+  let migradas = 0;
+  for (const [id, dispositivoBruto] of mapa) {
+    const dispositivo = String(dispositivoBruto).trim().toLowerCase();
+    try {
+      const r = await pool.query(
+        'UPDATE etiquetas SET dispositivo = $2 WHERE id = $1 AND dispositivo IS NULL',
+        [id, dispositivo]
+      );
+      migradas += r.rowCount;
+    } catch (err) {
+      if (err && err.code === '23505') {
+        console.log(`[db] MAPA_ETIQUETAS: placa ${dispositivo} já vinculada a outra etiqueta — ${id} não migrada`);
+      } else {
+        console.error(`[db] MAPA_ETIQUETAS: erro migrando ${id}=${dispositivo}:`, err && err.message);
+      }
+    }
+  }
+  if (migradas) console.log(`[db] MAPA_ETIQUETAS: ${migradas} vínculo(s) copiado(s) para a coluna dispositivo`);
+  return migradas;
+}
+
+module.exports = { prepare, exec, inicializarEsquema, migrarDispositivosDoMapa, pool };

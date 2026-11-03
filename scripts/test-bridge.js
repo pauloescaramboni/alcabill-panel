@@ -3,7 +3,7 @@
 // Testes da ponte EMQX (sem dependências: só node:assert).
 // Uso: npm test
 const assert = require('node:assert/strict');
-const { montarPayload, parseMapa } = require('../src/emqx-bridge');
+const { montarPayload, parseMapa, normalizarDispositivo, resolverDispositivo } = require('../src/emqx-bridge');
 
 let ok = 0;
 function teste(nome, fn) {
@@ -62,6 +62,40 @@ teste('parseMapa tolera espaços, vazios e entradas inválidas', () => {
 teste('parseMapa vazio/undefined', () => {
   assert.equal(parseMapa(undefined).size, 0);
   assert.equal(parseMapa('').size, 0);
+});
+
+teste('normalizarDispositivo: trim + minúsculas', () => {
+  assert.deepEqual(normalizarDispositivo('  Etiqueta01 '), { ok: true, valor: 'etiqueta01' });
+  assert.deepEqual(normalizarDispositivo('placa_2-b'), { ok: true, valor: 'placa_2-b' });
+  assert.deepEqual(normalizarDispositivo('0'), { ok: true, valor: '0' });
+});
+
+teste('normalizarDispositivo: vazio/null = desvincular', () => {
+  assert.deepEqual(normalizarDispositivo(''), { ok: true, valor: '' });
+  assert.deepEqual(normalizarDispositivo('   '), { ok: true, valor: '' });
+  assert.deepEqual(normalizarDispositivo(null), { ok: true, valor: '' });
+});
+
+teste('normalizarDispositivo: inválidos', () => {
+  for (const v of ['-abc', '_abc', 'a b', 'placa/1', 'a+b', 'etiquéta', 'a#', 'x'.repeat(33), {}, ['a'], true]) {
+    assert.equal(normalizarDispositivo(v).ok, false, `deveria rejeitar ${JSON.stringify(v)}`);
+  }
+  assert.equal(normalizarDispositivo('x'.repeat(32)).ok, true);
+});
+
+teste('resolverDispositivo: coluna > mapa > nenhum', () => {
+  const m = parseMapa('ALC-000001=etiqueta01,ALC-000002=etiqueta02');
+  assert.deepEqual(resolverDispositivo('ALC-000001', 'placa9', m), { dispositivo: 'placa9', origem: 'coluna' });
+  assert.deepEqual(resolverDispositivo('ALC-000001', null, m), { dispositivo: 'etiqueta01', origem: 'mapa' });
+  assert.deepEqual(resolverDispositivo('ALC-000001', undefined, m), { dispositivo: 'etiqueta01', origem: 'mapa' });
+  assert.deepEqual(resolverDispositivo('ALC-000009', null, m), { dispositivo: null, origem: null });
+  assert.deepEqual(resolverDispositivo('ALC-000009', null), { dispositivo: null, origem: null });
+});
+
+teste('resolverDispositivo: coluna vazia (desvinculada) não cai no mapa', () => {
+  const m = parseMapa('ALC-000001=etiqueta01');
+  assert.deepEqual(resolverDispositivo('ALC-000001', '', m), { dispositivo: null, origem: null });
+  assert.deepEqual(resolverDispositivo('ALC-000001', '  ', m), { dispositivo: null, origem: null });
 });
 
 console.log(`\n${ok} teste(s) passaram.`);

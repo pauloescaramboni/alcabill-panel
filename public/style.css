@@ -244,6 +244,11 @@ select option { background: var(--superficie); color: var(--texto); }
 .grade-info > div:first-child { grid-column: 1 / -1; }
 .grade-info > div:first-child b { font-size: 22px; font-weight: 700; letter-spacing: .01em; }
 
+.linha-placa { display: block; margin-top: 4px; font-size: 13px; font-weight: 500; color: var(--texto-2); overflow-wrap: anywhere; }
+.linha-placa.sem-placa { color: #fbbf24; }
+.placa-leitura { font-size: 15px; color: var(--texto); padding: 4px 0; overflow-wrap: anywhere; }
+label .opcional { font-weight: 500; color: var(--texto-apagado); }
+
 .painel-edicao { margin-top: 14px; border-top: 1px dashed var(--linha-forte); padding-top: 4px; }
 .linha-botoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .linha-botoes .botao { margin-top: 0; }

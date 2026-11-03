@@ -260,10 +260,37 @@ Variáveis de ambiente (no Render: Environment):
 | `MQTT_URL` | `mqtts://xxxx.ala.us-east-1.emqxsl.com:8883` | endereço do EMQX (sem ela a ponte fica desativada) |
 | `MQTT_USER` | `painel` | usuário do EMQX |
 | `MQTT_PASS` | `********` | senha do EMQX (nunca aparece nos logs) |
-| `MAPA_ETIQUETAS` | `ALC-000001=etiqueta01,ALC-000002=etiqueta02` | qual etiqueta do painel vai para qual placa |
+| `MAPA_ETIQUETAS` | `ALC-000001=etiqueta01,ALC-000002=etiqueta02` | **só compatibilidade** (ver abaixo) |
 
-Etiquetas sem entrada no `MAPA_ETIQUETAS` não são publicadas (só aparece um
-aviso no log). Testes da montagem do texto: `npm test`.
+### Vínculo etiqueta → placa (pelo painel)
+
+Qual placa recebe cada etiqueta agora é definido **no próprio painel**, sem
+mexer nas variáveis do Render: abra o cartão da etiqueta e preencha
+**Placa vinculada** (ex.: `etiqueta01` — o `<dispositivo>` do tópico
+`alcabill/<dispositivo>/dados`). Também dá para informar a placa ao criar a
+etiqueta. Regras:
+
+- Só administradores vinculam/trocam a placa (usuário comum só vê; a API
+  responde 403 se tentar).
+- Nome em minúsculas, até 32 caracteres: letras sem acento, números, `-` e
+  `_`, começando por letra ou número. Deixar vazio desvincula.
+- Uma placa só pode estar em uma etiqueta (a API responde 409 dizendo qual
+  etiqueta já usa).
+- Ao trocar de placa, o painel apaga a mensagem retida no tópico da placa
+  antiga (publica um retido vazio) e publica o estado atual no tópico novo.
+- A troca fica registrada no histórico da etiqueta (campo `dispositivo`).
+- O cartão mostra "Placa: …" ou, em âmbar, "Sem placa vinculada" — etiqueta
+  sem placa não atualiza nada físico.
+
+O vínculo fica na coluna `etiquetas.dispositivo` do Postgres. O
+`MAPA_ETIQUETAS` continua aceito só por compatibilidade: na subida, cada par
+do mapa é copiado para a coluna das etiquetas que **nunca** tiveram placa
+definida (não sobrescreve o que foi feito no painel), e a ponte ainda usa o
+mapa como reserva para essas etiquetas. Depois de conferir que os vínculos
+aparecem no painel, a variável pode ser removida do Render.
+
+Etiquetas sem placa não são publicadas (só aparece um aviso no log). Testes
+da montagem do texto e do vínculo: `npm test`.
 
 ## Estrutura do projeto
 

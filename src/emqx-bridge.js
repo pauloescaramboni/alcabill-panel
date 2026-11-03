@@ -13,6 +13,10 @@
 //   MQTT_USER       usuário do EMQX
 //   MQTT_PASS       senha do EMQX (nunca é logada)
 //   MAPA_ETIQUETAS  ex.: ALC-000001=etiqueta01,ALC-000002=etiqueta02
+//                   (só compatibilidade: o vínculo etiqueta -> placa agora é
+//                   a coluna `etiquetas.dispositivo`, editada pelo painel;
+//                   o mapa é usado quando a coluna nunca foi definida/NULL e
+//                   é copiado para a coluna no boot — ver migrarDispositivosDoMapa)
 //
 // Sem MQTT_URL a ponte fica desativada e publicarNaEtiqueta() vira no-op.
 // ---------------------------------------------------------------------------
@@ -58,6 +62,46 @@ function montarPayload({ codigo, descricao, localizacao, status } = {}) {
   ].join('|');
 }
 
+// Nome da placa (o <dispositivo> de alcabill/<dispositivo>/dados).
+const RE_DISPOSITIVO = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+
+// Função pura: normaliza (trim + minúsculas) e valida o nome da placa.
+// Vazio é válido (= desvincular). Devolve { ok, valor } ou { ok: false, erro }.
+function normalizarDispositivo(valor) {
+  if (valor === null || valor === undefined) return { ok: true, valor: '' };
+  if (typeof valor !== 'string' && typeof valor !== 'number') {
+    return { ok: false, erro: 'Placa inválida.' };
+  }
+  const v = String(valor).trim().toLowerCase();
+  if (v === '' || RE_DISPOSITIVO.test(v)) return { ok: true, valor: v };
+  return {
+    ok: false,
+    erro: 'Placa inválida: use até 32 caracteres (letras sem acento, números, "-" ou "_"), começando por letra ou número. Ex.: etiqueta01',
+  };
+}
+
+// Função pura: qual placa recebe a etiqueta.
+//   - coluna preenchida          -> coluna            (origem 'coluna')
+//   - coluna '' (desvinculada pelo painel) -> nenhuma (origem null)
+//   - coluna NULL (nunca definida) -> MAPA_ETIQUETAS  (origem 'mapa'), se houver
+// O '' explícito NÃO cai no mapa: senão "desvincular" no painel seria
+// desfeito pelo fallback de compatibilidade.
+function resolverDispositivo(id, coluna, mapaEtiquetas = new Map()) {
+  if (coluna !== null && coluna !== undefined) {
+    const c = String(coluna).trim();
+    return c ? { dispositivo: c, origem: 'coluna' } : { dispositivo: null, origem: null };
+  }
+  const doMapa = mapaEtiquetas.get(String(id));
+  return doMapa ? { dispositivo: doMapa, origem: 'mapa' } : { dispositivo: null, origem: null };
+}
+
+// Usa o mapa carregado do ambiente (em iniciarPonte ou, se a ponte ainda não
+// subiu, lido na hora).
+function dispositivoDaEtiqueta(id, coluna) {
+  const m = iniciada ? mapa : parseMapa(process.env.MAPA_ETIQUETAS);
+  return resolverDispositivo(id, coluna, m);
+}
+
 function iniciarPonte(env = process.env) {
   if (iniciada) return;
   iniciada = true;
@@ -97,25 +141,26 @@ function iniciarPonte(env = process.env) {
   try { host = new URL(env.MQTT_URL).host; } catch (_) { /* mantém */ }
 
   client.on('connect', () => {
-    console.log(`[emqx] conectado a ${host} como ${clientId} (${mapa.size} etiqueta(s) mapeada(s))`);
+    console.log(`[emqx] conectado a ${host} como ${clientId}`);
   });
   client.on('reconnect', () => console.log('[emqx] tentando reconectar...'));
   client.on('offline', () => console.log('[emqx] offline'));
   client.on('error', (err) => console.error('[emqx] erro:', err && err.message));
 }
 
-function publicarNaEtiqueta({ id, codigo, descricao, localizacao, status } = {}) {
+function avisarSemCliente() {
+  if (!iniciada && !avisouDesativada) {
+    avisouDesativada = true;
+    console.log('[emqx] ponte EMQX desativada (não inicializada)');
+  }
+}
+
+// `dispositivo` já vem resolvido pelo chamador (ver dispositivoDaEtiqueta).
+function publicarNaEtiqueta({ id, dispositivo, codigo, descricao, localizacao, status } = {}) {
   try {
-    if (!client) {
-      if (!iniciada && !avisouDesativada) {
-        avisouDesativada = true;
-        console.log('[emqx] ponte EMQX desativada (não inicializada)');
-      }
-      return;
-    }
-    const dispositivo = mapa.get(String(id));
+    if (!client) { avisarSemCliente(); return; }
     if (!dispositivo) {
-      console.log(`[emqx] etiqueta ${id} sem mapeamento em MAPA_ETIQUETAS — não publicado`);
+      console.log(`[emqx] etiqueta ${id} sem placa vinculada — não publicado`);
       return;
     }
     const topico = `alcabill/${dispositivo}/dados`;
@@ -129,4 +174,32 @@ function publicarNaEtiqueta({ id, codigo, descricao, localizacao, status } = {})
   }
 }
 
-module.exports = { iniciarPonte, publicarNaEtiqueta, montarPayload, parseMapa, limparCampo };
+// Apaga a mensagem retida de uma placa que deixou de estar vinculada: pela
+// especificação MQTT, um PUBLISH retido com payload vazio (zero bytes) remove
+// o retained do tópico no broker. Sem isso, a placa antiga continuaria
+// recebendo o último estado da etiqueta ao reconectar.
+function limparRetido(dispositivo) {
+  try {
+    if (!client) { avisarSemCliente(); return; }
+    if (!dispositivo) return;
+    const topico = `alcabill/${dispositivo}/dados`;
+    client.publish(topico, '', { qos: 1, retain: true }, (err) => {
+      if (err) console.error(`[emqx] falha ao limpar retido em ${topico}:`, err.message);
+      else console.log(`[emqx] retido limpo em ${topico}`);
+    });
+  } catch (err) {
+    console.error('[emqx] erro ao limpar retido:', err && err.message);
+  }
+}
+
+module.exports = {
+  iniciarPonte,
+  publicarNaEtiqueta,
+  limparRetido,
+  dispositivoDaEtiqueta,
+  resolverDispositivo,
+  normalizarDispositivo,
+  montarPayload,
+  parseMapa,
+  limparCampo,
+};

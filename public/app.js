@@ -15,6 +15,15 @@ let termoBusca = '';
 // DOM porque a lista é recriada via innerHTML e o DOM perde esse estado.
 let edicaoAbertaId = null;
 let listaPendente = false; // polling chegou enquanto o usuário editava
+// Papel do usuário logado ('admin' | 'usuario'): decide se a placa vinculada
+// é editável. A API confere de novo (403 para não-admin).
+let papelUsuario = null;
+function ehAdmin() { return papelUsuario === 'admin'; }
+
+// Escapa texto vindo do banco antes de ir para innerHTML.
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 async function api(caminho, opcoes = {}) {
   const resp = await fetch(caminho, {
@@ -41,6 +50,7 @@ function mostrarApp() {
 // Nome no topo + botão "Usuários" só aparece pra quem é admin (só admin
 // pode criar acesso pra mais gente — ver rota /api/usuarios no server).
 function aplicarUsuarioLogado(user) {
+  papelUsuario = user.papel;
   document.getElementById('usuario-nome').textContent = user.nome;
   document.getElementById('btn-usuarios').classList.toggle('oculto', user.papel !== 'admin');
 }
@@ -272,7 +282,14 @@ function lerRascunhoEdicao() {
   const loc = document.getElementById(`loc-${edicaoAbertaId}`);
   const sts = document.getElementById(`sts-${edicaoAbertaId}`);
   if (!loc || !sts) return null;
-  return { localizacao: loc.value, status: sts.value };
+  const disp = document.getElementById(`disp-${edicaoAbertaId}`);
+  const erroEl = document.getElementById(`erro-edicao-${edicaoAbertaId}`);
+  return {
+    localizacao: loc.value,
+    status: sts.value,
+    dispositivo: disp ? disp.value : null,
+    erro: erroEl && !erroEl.classList.contains('oculto') ? erroEl.textContent : '',
+  };
 }
 
 function cartaoHtml(e) {
@@ -296,11 +313,30 @@ function cartaoHtml(e) {
       <span class="badge status-${e.status}">${rotuloStatus(e.status)}</span>
     </div>
     <div class="grade-info">
-      <div>Localização<b>${e.localizacao || '—'}</b></div>
+      <div>Localização<b>${e.localizacao || '—'}</b>${linhaPlaca(e)}</div>
       ${bateria}
     </div>
     <div class="painel-edicao oculto" id="edicao-${e.id}"></div>
   </div>`;
+}
+
+// Linha discreta com a placa física vinculada. Sem placa, a etiqueta não
+// atualiza nada físico — por isso o aviso em âmbar.
+function linhaPlaca(e) {
+  return e.dispositivo
+    ? `<span class="linha-placa">Placa: ${esc(e.dispositivo)}</span>`
+    : '<span class="linha-placa sem-placa">Sem placa vinculada</span>';
+}
+
+function campoPlacaEdicao(id, valor) {
+  if (ehAdmin()) {
+    return `
+    <label for="disp-${id}">Placa vinculada</label>
+    <input type="text" id="disp-${id}" placeholder="ex.: etiqueta01" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" maxlength="32" />`;
+  }
+  return `
+    <label>Placa vinculada</label>
+    <div class="placa-leitura">${valor ? esc(valor) : 'Nenhuma placa vinculada'}</div>`;
 }
 
 function fecharEdicao() {
@@ -322,6 +358,7 @@ function abrirEdicao(id, rascunho = null) {
   edicaoAbertaId = id;
   const valorLoc = rascunho ? rascunho.localizacao : (e.localizacao || '');
   const valorSts = rascunho ? rascunho.status : e.status;
+  const valorDisp = rascunho && rascunho.dispositivo !== null ? rascunho.dispositivo : (e.dispositivo || '');
   painel.innerHTML = `
     <label>Localização</label>
     <input type="text" id="loc-${id}" />
@@ -329,6 +366,8 @@ function abrirEdicao(id, rascunho = null) {
     <select id="sts-${id}">
       ${Object.keys(ROTULOS_STATUS).map((s) => `<option value="${s}" ${s === valorSts ? 'selected' : ''}>${ROTULOS_STATUS[s]}</option>`).join('')}
     </select>
+    ${campoPlacaEdicao(id, e.dispositivo)}
+    <div class="erro oculto" id="erro-edicao-${id}"></div>
     <div class="linha-botoes">
       <button class="botao pequeno" data-acao="salvar">Salvar</button>
       <button class="botao pequeno secundario" data-acao="reenviar">Reenviar atualização</button>
@@ -336,16 +375,40 @@ function abrirEdicao(id, rascunho = null) {
     </div>
   `;
   painel.querySelector(`#loc-${id}`).value = valorLoc;
+  const dispEl = painel.querySelector(`#disp-${id}`);
+  if (dispEl) dispEl.value = valorDisp;
+  if (rascunho && rascunho.erro) mostrarErroEdicao(id, rascunho.erro);
   painel.classList.remove('oculto');
   painel.querySelector('[data-acao="salvar"]').addEventListener('click', () => salvarEdicao(id));
   painel.querySelector('[data-acao="reenviar"]').addEventListener('click', () => reenviar(id));
   painel.querySelector('[data-acao="historico"]').addEventListener('click', () => abrirHistorico(id));
 }
 
+function mostrarErroEdicao(id, msg) {
+  const erroEl = document.getElementById(`erro-edicao-${id}`);
+  if (!erroEl) { alert(msg); return; }
+  erroEl.textContent = msg;
+  erroEl.classList.toggle('oculto', !msg);
+}
+
 async function salvarEdicao(id) {
   const localizacao = document.getElementById(`loc-${id}`).value;
   const status = document.getElementById(`sts-${id}`).value;
-  await api(`/api/etiquetas/${id}`, { method: 'PUT', body: { localizacao, status } });
+  const body = { localizacao, status };
+  // Placa: só admin envia, e só se mudou (a API normaliza e valida de novo).
+  const dispEl = document.getElementById(`disp-${id}`);
+  const e = etiquetasCache.find((x) => x.id === id);
+  if (dispEl && ehAdmin()) {
+    const novo = dispEl.value.trim().toLowerCase();
+    if (novo !== ((e && e.dispositivo) || '')) body.dispositivo = novo;
+  }
+  mostrarErroEdicao(id, '');
+  try {
+    await api(`/api/etiquetas/${id}`, { method: 'PUT', body });
+  } catch (err) {
+    mostrarErroEdicao(id, err.message);
+    return; // painel continua aberto com o que foi digitado
+  }
   if (document.activeElement && listaEl.contains(document.activeElement)) document.activeElement.blur();
   fecharEdicao();
   listaPendente = false;
@@ -475,6 +538,8 @@ document.getElementById('btn-nova-etiqueta').addEventListener('click', () => {
       <button type="button" class="botao pequeno secundario" id="ne-ir-produto-existente" style="margin-top:6px">← usar produto já cadastrado</button>
     </div>
     <label>Localização</label><input id="ne-localizacao" placeholder="ex.: A-03-02" />
+    ${ehAdmin() ? `<label for="ne-dispositivo">Placa vinculada <span class="opcional">(opcional)</span></label>
+    <input id="ne-dispositivo" placeholder="ex.: etiqueta01" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" maxlength="32" />` : ''}
     <div class="erro oculto" id="ne-erro"></div>
     <div class="linha-botoes">
       <button class="botao" id="ne-salvar">Criar</button>
@@ -514,7 +579,10 @@ document.getElementById('btn-nova-etiqueta').addEventListener('click', () => {
       } else {
         produto_id = Number(document.getElementById('ne-produto').value) || null;
       }
-      const nova = await api('/api/etiquetas', { method: 'POST', body: { produto_id, localizacao } });
+      const corpo = { produto_id, localizacao };
+      const dispEl = document.getElementById('ne-dispositivo');
+      if (dispEl && ehAdmin() && dispEl.value.trim()) corpo.dispositivo = dispEl.value.trim().toLowerCase();
+      const nova = await api('/api/etiquetas', { method: 'POST', body: corpo });
       fecharModal();
       await carregarTudo();
       alert(`Etiqueta ${nova.id} criada e enviada para a placa.`);

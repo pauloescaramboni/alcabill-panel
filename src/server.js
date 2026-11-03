@@ -135,10 +135,14 @@ async function publicarComando(etiquetaId) {
 
   // Ponte para a etiqueta física no EMQX (texto puro, retained). Nunca pode
   // quebrar a resposta HTTP — publicarNaEtiqueta já captura erros, mas o
-  // try/catch aqui garante isso mesmo se algo mudar lá dentro.
+  // try/catch aqui garante isso mesmo se algo mudar lá dentro. A placa vem da
+  // coluna `dispositivo` (definida pelo painel); MAPA_ETIQUETAS só como
+  // fallback de compatibilidade quando a coluna é NULL.
   try {
+    const { dispositivo } = emqx.dispositivoDaEtiqueta(etiquetaId, etiqueta.dispositivo);
     emqx.publicarNaEtiqueta({
       id: etiquetaId,
+      dispositivo,
       codigo: payload.codigo,
       descricao: payload.descricao,
       localizacao: payload.localizacao,
@@ -180,6 +184,29 @@ function readBody(req) {
 
 // Status de estoque aceitos para uma etiqueta (cabem na caixinha do e-paper).
 const STATUS_VALIDOS = ['ok', 'baixo', 'falta'];
+
+// Valida o campo `dispositivo` vindo do corpo de POST/PUT de etiqueta.
+// Devolve { erro: [statusHttp, mensagem] } ou { valor } ('' = desvincular).
+// `undefined` (campo ausente) não chega aqui.
+async function validarDispositivo(valorBruto, usuario, etiquetaIdAtual) {
+  if (usuario.papel !== 'admin') {
+    return { erro: [403, 'Só administradores podem vincular ou trocar a placa de uma etiqueta.'] };
+  }
+  const n = emqx.normalizarDispositivo(valorBruto);
+  if (!n.ok) return { erro: [400, n.erro] };
+  if (n.valor) {
+    const outra = await db.prepare('SELECT id FROM etiquetas WHERE dispositivo = ? AND id <> ?')
+      .get(n.valor, etiquetaIdAtual || '');
+    if (outra) return { erro: [409, `A placa ${n.valor} já está vinculada à etiqueta ${outra.id}.`] };
+  }
+  return { valor: n.valor };
+}
+
+// Violação do índice único etiquetas_dispositivo_unico (corrida entre duas
+// requisições que passaram pela checagem acima ao mesmo tempo).
+function ehConflitoDispositivo(err) {
+  return err && err.code === '23505' && String(err.constraint || err.message || '').includes('etiquetas_dispositivo_unico');
+}
 
 function sendJson(res, statusCode, obj, extraHeaders = {}) {
   const body = JSON.stringify(obj);
@@ -343,13 +370,26 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/etiquetas' && req.method === 'POST') {
-      const { produto_id, localizacao = '' } = await readBody(req);
+      const { produto_id, localizacao = '', dispositivo: dispositivoBruto } = await readBody(req);
+      // Campo ausente -> NULL (a ponte ainda pode usar MAPA_ETIQUETAS).
+      let dispositivo = null;
+      if (dispositivoBruto !== undefined) {
+        const v = await validarDispositivo(dispositivoBruto, usuario, null);
+        if (v.erro) return sendJson(res, v.erro[0], { erro: v.erro[1] });
+        dispositivo = v.valor || null;
+      }
       const id = await proximoSerial();
-      await db.prepare(`
-        INSERT INTO etiquetas (id, produto_id, localizacao, status, version, online, criado_em)
-        VALUES (?, ?, ?, 'ok', 1, 0, ?)
-      `).run(id, produto_id || null, localizacao, new Date().toISOString());
+      try {
+        await db.prepare(`
+          INSERT INTO etiquetas (id, produto_id, localizacao, status, version, online, criado_em, dispositivo)
+          VALUES (?, ?, ?, 'ok', 1, 0, ?, ?)
+        `).run(id, produto_id || null, localizacao, new Date().toISOString(), dispositivo);
+      } catch (err) {
+        if (ehConflitoDispositivo(err)) return sendJson(res, 409, { erro: `A placa ${dispositivo} já está vinculada a outra etiqueta.` });
+        throw err;
+      }
       await registrarHistorico(id, 'criação', null, `etiqueta ${id} criada`, usuario.nome);
+      if (dispositivo) await registrarHistorico(id, 'dispositivo', null, dispositivo, usuario.nome);
       await publicarComando(id);
       return sendJson(res, 201, await db.prepare('SELECT * FROM etiquetas WHERE id = ?').get(id));
     }
@@ -368,6 +408,34 @@ const server = http.createServer(async (req, res) => {
         if (alteracoes.status !== undefined && !STATUS_VALIDOS.includes(alteracoes.status)) {
           return sendJson(res, 400, { erro: `status inválido: use ${STATUS_VALIDOS.join(', ')}` });
         }
+        // Placa vinculada: só admin; validada antes de gravar qualquer campo.
+        let dispositivoNovo; // undefined = não mexer
+        if (alteracoes.dispositivo !== undefined) {
+          const v = await validarDispositivo(alteracoes.dispositivo, usuario, etiquetaId);
+          if (v.erro) return sendJson(res, v.erro[0], { erro: v.erro[1] });
+          dispositivoNovo = v.valor;
+        }
+        // Placa efetiva hoje (coluna ou fallback do mapa) — é dela que o
+        // retido precisa ser limpo se o vínculo mudar.
+        const dispositivoAntigo = emqx.dispositivoDaEtiqueta(etiquetaId, etiqueta.dispositivo).dispositivo;
+        let trocouPlaca = false;
+        // Grava se o valor guardado muda. Caso especial: coluna NULL com placa
+        // vinda do MAPA_ETIQUETAS — mandar '' precisa gravar '' para
+        // desvincular de verdade (senão o fallback continuaria publicando).
+        const guardado = etiqueta.dispositivo;
+        const gravar = dispositivoNovo !== undefined && (guardado === null || guardado === undefined
+          ? (dispositivoNovo !== '' || !!dispositivoAntigo)
+          : dispositivoNovo !== guardado);
+        if (gravar) {
+          try {
+            await db.prepare('UPDATE etiquetas SET dispositivo = ? WHERE id = ?').run(dispositivoNovo, etiquetaId);
+          } catch (err) {
+            if (ehConflitoDispositivo(err)) return sendJson(res, 409, { erro: `A placa ${dispositivoNovo} já está vinculada a outra etiqueta.` });
+            throw err;
+          }
+          await registrarHistorico(etiquetaId, 'dispositivo', etiqueta.dispositivo || null, dispositivoNovo || '(nenhuma)', usuario.nome);
+          trocouPlaca = (dispositivoAntigo || '') !== dispositivoNovo;
+        }
         const campos = ['localizacao', 'status'];
         let mudou = false;
         for (const campo of campos) {
@@ -377,10 +445,14 @@ const server = http.createServer(async (req, res) => {
             mudou = true;
           }
         }
+        if (trocouPlaca && dispositivoAntigo) {
+          try { emqx.limparRetido(dispositivoAntigo); } catch (err) { console.error('[emqx] erro inesperado na ponte:', err && err.message); }
+        }
         if (mudou) {
           await db.prepare('UPDATE etiquetas SET version = version + 1 WHERE id = ?').run(etiquetaId);
-          await publicarComando(etiquetaId);
         }
+        // Placa nova recebe o estado atual mesmo se só o vínculo mudou.
+        if (mudou || trocouPlaca) await publicarComando(etiquetaId);
         return sendJson(res, 200, await db.prepare('SELECT * FROM etiquetas WHERE id = ?').get(etiquetaId));
       }
 
@@ -441,6 +513,13 @@ async function limparSessoes() {
 
 async function iniciar() {
   await db.inicializarEsquema();
+  // Compatibilidade: copia MAPA_ETIQUETAS para a coluna `dispositivo` onde
+  // ela nunca foi definida. Falha aqui só loga — não impede o painel de subir.
+  try {
+    await db.migrarDispositivosDoMapa(emqx.parseMapa(process.env.MAPA_ETIQUETAS));
+  } catch (err) {
+    console.error('[startup] erro migrando MAPA_ETIQUETAS:', err && err.message);
+  }
   await garantirUsuarioAdmin();
   await limparSessoes();
   setInterval(limparSessoes, LIMPEZA_SESSOES_MS).unref();
