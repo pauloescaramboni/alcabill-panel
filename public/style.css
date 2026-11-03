@@ -1,9 +1,9 @@
 /* ALCABILL — tema único escuro.
    Amarelo forte só onde manda o olho: botão primário, serial, total de
-   etiquetas, lupa, faixa do topo e borda do cartão. Contornos secundários
-   usam o amarelo atenuado (--marca-contorno).
+   etiquetas, lupa e borda do cartão de etiqueta.
    Blocos (login, campos, contadores, cartões, modais, botões secundários)
-   são "vidro fosco" sobre brilhos amarelos difusos e fixos no fundo. */
+   são "vidro fosco" sem contorno sobre brilhos amarelos difusos e fixos no
+   fundo; o foco aparece como anel amarelo (box-shadow). */
 :root {
   color-scheme: dark;
   /* paleta: #202020 (fundo), #333533 (cinza esverdeado), #D6D6D6 (texto) */
@@ -19,22 +19,20 @@
   --texto-sobre-marca: #202020;
   --marca: #f5b800;
   --marca-viva: #fcc419;
-  --marca-contorno: rgba(245, 184, 0, .45);
   --marca-nome: #f9c300;
   --verde: #3ddc68;
   --vermelho: #fca5a5;
   --raio-bloco: 18px;
   --raio-campo: 14px;
   /* vidro fosco */
-  --vidro: rgba(214, 214, 214, .06);
-  --vidro-campo: rgba(214, 214, 214, .045);
-  --vidro-solido: #2a2b2a; /* fallback sem backdrop-filter */
-  --vidro-borda: 1px solid rgba(214, 214, 214, .14);
+  --vidro: rgba(214, 214, 214, .085);
+  --vidro-campo: rgba(214, 214, 214, .07);
+  --vidro-solido: #2d2e2d; /* fallback sem backdrop-filter */
   --vidro-realce: inset 0 1px 0 rgba(214, 214, 214, .08);
   --sombra-bloco: 0 20px 50px rgba(0, 0, 0, .45);
   --sombra-logo: drop-shadow(0 10px 22px rgba(0,0,0,.7)) drop-shadow(0 2px 4px rgba(0,0,0,.5));
   --marca-hover: rgba(245, 184, 0, .1);
-  --marca-foco: rgba(245, 184, 0, .22);
+  --anel-foco: 0 0 0 2px var(--marca);
   --vidro-blur: blur(14px) saturate(140%);
   --brilhos-fundo:
     radial-gradient(60vmax 40vmax at 15% 10%, rgba(245, 184, 0, .144), transparent 60%),
@@ -60,7 +58,6 @@ button, input, select { font: inherit; color: inherit; }
   background: var(--fundo); padding: 14px 16px;
   display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px 12px;
   position: sticky; top: 0; z-index: 5;
-  border-bottom: 3px solid var(--marca);
 }
 .topo .marca-topo { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .topo h1 {
@@ -71,12 +68,13 @@ button, input, select { font: inherit; color: inherit; }
 .acoes-topo { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .acoes-topo .meta { font-size: 14px; color: var(--texto-2); font-weight: 600; }
 .topo button {
-  background: var(--vidro); border: 1.5px solid var(--marca-contorno); color: var(--texto);
+  background: var(--vidro); border: 0; color: var(--texto);
   -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur); box-shadow: var(--vidro-realce);
-  min-height: 40px; padding: 8px 14px; border-radius: var(--raio-campo); font-size: 14px; font-weight: 600;
-  cursor: pointer; transition: border-color .15s ease, background-color .15s ease;
+  min-height: 40px; padding: 9.5px 15.5px; border-radius: var(--raio-campo); font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: background-color .15s ease, box-shadow .15s ease;
 }
-.topo button:hover { border-color: var(--marca); background-color: var(--marca-hover); }
+.topo button:hover { background-color: var(--marca-hover); }
+.topo button:focus-visible { outline: none; box-shadow: var(--vidro-realce), var(--anel-foco); }
 
 .container { max-width: 720px; margin: 0 auto; padding: 16px; }
 
@@ -85,7 +83,7 @@ button, input, select { font: inherit; color: inherit; }
   background: var(--fundo); background-image: var(--brilhos-login); background-attachment: fixed; }
 @keyframes login-entrar { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .cartao-login {
-  background: var(--vidro); border: var(--vidro-borda); border-radius: 22px;
+  background: var(--vidro); border: 0; border-radius: 22px;
   -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur);
   box-shadow: var(--vidro-realce), var(--sombra-bloco);
   padding: 28px 22px; width: 100%; max-width: 380px;
@@ -102,16 +100,15 @@ label { display: block; font-size: 14px; font-weight: 600; color: var(--texto-2)
 input, select {
   width: 100%; min-height: 48px; padding: 10px 14px;
   background-color: var(--vidro-campo); color: var(--texto);
-  border: var(--vidro-borda); border-radius: var(--raio-campo);
+  border: 0; border-radius: var(--raio-campo);
   -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur); box-shadow: var(--vidro-realce);
   font-size: 16px; font-weight: 500;
-  transition: border-color .15s ease, box-shadow .15s ease;
+  transition: box-shadow .15s ease;
 }
 input[type=search] { -webkit-appearance: none; appearance: none; }
 input[type=search]::-webkit-search-decoration { -webkit-appearance: none; }
 input::placeholder { color: var(--texto-apagado); }
-input:focus, select:focus { outline: none; border-color: var(--marca); box-shadow: var(--vidro-realce), 0 0 0 3px var(--marca-foco); }
-input:focus-visible, select:focus-visible { outline: 2px solid var(--marca); outline-offset: 1px; }
+input:focus, select:focus, input:focus-visible, select:focus-visible { outline: none; box-shadow: var(--vidro-realce), var(--anel-foco); }
 select {
   appearance: none; -webkit-appearance: none; padding-right: 40px; cursor: pointer;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23f5b800' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
@@ -125,24 +122,26 @@ select option { background: var(--superficie); color: var(--texto); }
   background: var(--marca); color: var(--texto-sobre-marca); font-weight: 700; border: 1.5px solid var(--marca);
   min-height: 48px; padding: 10px 18px; border-radius: var(--raio-campo); font-size: 16px;
   cursor: pointer; margin-top: 12px;
-  transition: background-color .15s ease, border-color .15s ease, transform .05s ease;
+  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, transform .05s ease;
 }
 .botao:hover { background: var(--marca-viva); border-color: var(--marca-viva); }
+.botao:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--fundo), 0 0 0 4px var(--marca); }
 .botao:active { transform: translateY(1px); }
 .botao.secundario {
-  background: var(--vidro); color: var(--texto); border-color: var(--marca-contorno); font-weight: 600;
+  background: var(--vidro); color: var(--texto); border: 0; padding: 11.5px 19.5px; font-weight: 600;
   -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur); box-shadow: var(--vidro-realce);
 }
-.botao.secundario:hover { border-color: var(--marca); background-color: var(--marca-hover); }
+.botao.secundario:hover { background-color: var(--marca-hover); }
+.botao.secundario:focus-visible { box-shadow: var(--vidro-realce), var(--anel-foco); }
 .botao.pequeno { min-height: 44px; padding: 8px 14px; font-size: 15px; margin-top: 0; }
+.botao.secundario.pequeno { padding: 9.5px 15.5px; }
 .botao:disabled { opacity: .5; cursor: not-allowed; }
 .erro { color: var(--vermelho); font-size: 14px; font-weight: 600; margin-top: 10px; }
 
 /* ---------- busca ---------- */
 .campo-busca { position: relative; margin: 14px 0 0; }
 .campo-busca svg { position: absolute; z-index: 1; left: 14px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: var(--marca); pointer-events: none; }
-#busca { padding-left: 44px; border: 1.5px solid var(--marca-contorno); min-height: 50px; }
-#busca:focus { border-color: var(--marca); }
+#busca { padding-left: 44px; min-height: 50px; }
 
 .barra-acoes { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; align-items: center; }
 .barra-acoes label.check { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 500; color: var(--texto-2); margin: 0; min-height: 44px; cursor: pointer; }
@@ -151,7 +150,7 @@ select option { background: var(--superficie); color: var(--texto); }
 /* ---------- contadores ---------- */
 .resumo { display: flex; gap: 10px; margin: 4px 0 14px; }
 .resumo-item {
-  flex: 1; min-width: 0; background: var(--vidro); border: var(--vidro-borda); box-shadow: var(--vidro-realce);
+  flex: 1; min-width: 0; background: var(--vidro); border: 0; box-shadow: var(--vidro-realce);
   -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur);
   border-radius: var(--raio-bloco); padding: 14px 10px; text-align: center;
 }
@@ -209,17 +208,17 @@ select option { background: var(--superficie); color: var(--texto); }
 .modal {
   background: var(--vidro); color: var(--texto); width: 100%; max-width: 480px;
   -webkit-backdrop-filter: var(--vidro-blur); backdrop-filter: var(--vidro-blur); box-shadow: var(--vidro-realce);
-  border: var(--vidro-borda); border-bottom: 0; border-radius: 22px 22px 0 0;
+  border: 0; border-radius: 22px 22px 0 0;
   padding: 22px 18px calc(22px + env(safe-area-inset-bottom, 0px));
   max-height: 85vh; overflow-y: auto; animation: modal-entrar .18s ease;
 }
 .modal h3 { font-size: 20px; font-weight: 700; letter-spacing: -.01em; margin: 0 0 6px; }
 @media (min-width: 560px) {
   .modal-fundo { align-items: center; }
-  .modal { border-radius: 22px; border-bottom: var(--vidro-borda); padding-bottom: 22px; }
+  .modal { border-radius: 22px; padding-bottom: 22px; }
 }
 
-.vazio { text-align: center; color: var(--texto-2); padding: 34px 12px; font-size: 15px; border: 1.5px dashed var(--linha); border-radius: var(--raio-bloco); }
+.vazio { text-align: center; color: var(--texto-2); padding: 34px 12px; font-size: 15px; background: var(--vidro); border: 0; border-radius: var(--raio-bloco); }
 
 /* ---------- fallback sem backdrop-filter: vidro vira fundo translúcido liso ---------- */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
