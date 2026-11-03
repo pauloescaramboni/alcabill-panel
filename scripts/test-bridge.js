@@ -65,3 +65,6 @@ teste('parseMapa vazio/undefined', () => {
 });
 
 console.log(`\n${ok} teste(s) passaram.`);
+
+// Testes da lógica pura de sessão (renovação deslizante), sem banco.
+require('./test-sessao');

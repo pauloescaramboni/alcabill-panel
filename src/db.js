@@ -164,6 +164,22 @@ async function inicializarEsquema() {
     UPDATE etiquetas SET status = 'falta' WHERE status = 'inativo';
     UPDATE etiquetas SET status = 'baixo' WHERE status IN ('manutenção', 'manutencao');
   `);
+
+  // Sessões de login (antes ficavam num Map em memória e se perdiam a cada
+  // reinício do Render). Tabela nova, então usa TIMESTAMPTZ de verdade em vez
+  // das datas em TEXT das outras tabelas. Acessada direto via pool.query em
+  // src/auth.js (não pelo shim prepare(), que acrescentaria RETURNING * aos
+  // INSERTs pensando numa coluna "id" que esta tabela não tem).
+  await exec(`
+    CREATE TABLE IF NOT EXISTS sessoes (
+      sid TEXT PRIMARY KEY,
+      usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+      criado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
+      expira_em TIMESTAMPTZ NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS sessoes_expira_em_idx ON sessoes (expira_em);
+    CREATE INDEX IF NOT EXISTS sessoes_usuario_id_idx ON sessoes (usuario_id);
+  `);
 }
 
 module.exports = { prepare, exec, inicializarEsquema, pool };

@@ -164,9 +164,24 @@ function tempoRelativo(iso) {
   return `há ${h}h`;
 }
 
+// A placa ainda pode não reportar status (online/offline, bateria). Enquanto
+// nenhuma etiqueta tiver comunicado, escondemos o que dependeria disso.
+function jaComunicou(e) {
+  return !!e.ultima_comunicacao;
+}
+function algumaComunicou() {
+  return etiquetasCache.some(jaComunicou);
+}
+
 function renderizarResumo() {
   const total = etiquetasCache.length;
   if (total === 0) { resumoEl.innerHTML = ''; return; }
+  const comStatus = algumaComunicou();
+  resumoEl.classList.toggle('unico', !comStatus);
+  if (!comStatus) {
+    resumoEl.innerHTML = `<div class="resumo-item total"><b>${total}</b><span>etiquetas</span></div>`;
+    return;
+  }
   const online = etiquetasCache.filter((e) => e.online).length;
   const offline = total - online;
   resumoEl.innerHTML = `
@@ -178,6 +193,14 @@ function renderizarResumo() {
 
 function renderizarLista() {
   renderizarResumo();
+  const chkOffline = document.getElementById('chk-offline');
+  if (algumaComunicou()) {
+    chkOffline.closest('label').classList.remove('oculto');
+  } else {
+    chkOffline.closest('label').classList.add('oculto');
+    chkOffline.checked = false;
+    somenteOffline = false;
+  }
   let itens = somenteOffline ? etiquetasCache.filter((e) => !e.online) : etiquetasCache;
   if (termoBusca) {
     itens = itens.filter((e) => {
@@ -203,7 +226,13 @@ function renderizarLista() {
 }
 
 function cartaoHtml(e) {
-  const bateria = e.bateria_v != null ? `${e.bateria_v.toFixed(2)} V` : '—';
+  const comunicou = jaComunicou(e);
+  const linhaStatus = comunicou
+    ? `<div class="meta"><span class="status-dot ${e.online ? 'on' : 'off'}"></span>${e.online ? 'online' : 'offline'} · ${tempoRelativo(e.ultima_comunicacao)}</div>`
+    : '';
+  const bateria = e.bateria_v != null
+    ? `<div>Bateria<b>${Number(e.bateria_v).toFixed(2)} V</b></div>`
+    : '';
   const produto = e.produto_descricao || '(sem produto vinculado)';
   return `
   <div class="cartao-etiqueta" id="cartao-${e.id}">
@@ -211,14 +240,13 @@ function cartaoHtml(e) {
       <div>
         <div class="serial">${e.id}</div>
         <div class="produto-nome">${produto}</div>
-        <div class="meta"><span class="status-dot ${e.online ? 'on' : 'off'}"></span>${e.online ? 'online' : 'offline'} · ${tempoRelativo(e.ultima_comunicacao)}</div>
+        ${linhaStatus}
       </div>
       <span class="badge status-${e.status}">${rotuloStatus(e.status)}</span>
     </div>
     <div class="grade-info">
       <div>Localização<b>${e.localizacao || '—'}</b></div>
-      <div>Bateria<b>${bateria}</b></div>
-      <div>Versão<b>v${e.version}</b></div>
+      ${bateria}
     </div>
     <div class="painel-edicao oculto" id="edicao-${e.id}"></div>
   </div>`;
@@ -418,7 +446,7 @@ document.getElementById('btn-nova-etiqueta').addEventListener('click', () => {
       const nova = await api('/api/etiquetas', { method: 'POST', body: { produto_id, localizacao } });
       fecharModal();
       await carregarTudo();
-      alert(`Etiqueta ${nova.id} criada. Rode o simulador apontando para esse ID para vê-la responder:\n\nnpm run simulador -- --id=${nova.id}`);
+      alert(`Etiqueta ${nova.id} criada e enviada para a placa.`);
     } catch (err) {
       erroEl.textContent = err.message;
       erroEl.classList.remove('oculto');

@@ -187,13 +187,33 @@ function sendJson(res, statusCode, obj, extraHeaders = {}) {
   res.end(body);
 }
 
-function requireLogin(req, res) {
+// Cookie da sessão. `Secure` só quando a requisição chegou por HTTPS: no
+// Render o TLS termina no proxy, que avisa via x-forwarded-proto; localmente
+// (http://localhost) o cookie precisa funcionar sem Secure.
+function ehHttps(req) {
+  const proto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase();
+  return proto === 'https' || Boolean(req.socket && req.socket.encrypted);
+}
+
+function cookieSessao(req, sid) {
+  return `sid=${sid}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${auth.DURACAO_SESSAO_S}` + (ehHttps(req) ? '; Secure' : '');
+}
+
+function cookieApagado(req) {
+  return 'sid=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0' + (ehHttps(req) ? '; Secure' : '');
+}
+
+// Assíncrono: a sessão agora vem do Postgres (tabela `sessoes`), já com o
+// usuário junto (id, nome, email, papel). Se a validade foi renovada nesta
+// requisição, o cookie é reenviado com Max-Age cheio de novo.
+async function requireLogin(req, res) {
   const cookies = parseCookies(req);
-  const session = cookies.sid && auth.getSession(cookies.sid);
+  const session = cookies.sid ? await auth.getSession(cookies.sid) : null;
   if (!session) {
     sendJson(res, 401, { erro: 'não autenticado' });
     return null;
   }
+  if (session.renovada) res.setHeader('Set-Cookie', cookieSessao(req, session.sid));
   return session;
 }
 
@@ -233,21 +253,22 @@ const server = http.createServer(async (req, res) => {
       if (!user || !auth.verifyPassword(senha || '', user.senha_hash, user.salt)) {
         return sendJson(res, 401, { erro: 'email ou senha inválidos' });
       }
-      const token = auth.createSession(user.id);
+      const token = await auth.createSession(user.id);
       return sendJson(res, 200, { nome: user.nome, email: user.email, papel: user.papel }, {
-        'Set-Cookie': `sid=${token}; HttpOnly; Path=/; SameSite=Lax`,
+        'Set-Cookie': cookieSessao(req, token),
       });
     }
 
     if (pathname === '/api/logout' && req.method === 'POST') {
       const cookies = parseCookies(req);
-      if (cookies.sid) auth.destroySession(cookies.sid);
-      return sendJson(res, 200, { ok: true }, { 'Set-Cookie': 'sid=; Path=/; Max-Age=0' });
+      if (cookies.sid) await auth.destroySession(cookies.sid);
+      return sendJson(res, 200, { ok: true }, { 'Set-Cookie': cookieApagado(req) });
     }
 
-    const session = requireLogin(req, res);
+    const session = await requireLogin(req, res);
     if (!session) return; // requireLogin já respondeu 401
-    const usuario = await db.prepare('SELECT * FROM usuarios WHERE id = ?').get(session.userId);
+    // id, nome, email, papel — já vieram na mesma query da sessão.
+    const usuario = session.usuario;
 
     if (pathname === '/api/me' && req.method === 'GET') {
       return sendJson(res, 200, { nome: usuario.nome, email: usuario.email, papel: usuario.papel });
@@ -257,11 +278,14 @@ const server = http.createServer(async (req, res) => {
       const { senha_atual, senha_nova } = await readBody(req);
       if (!senha_atual || !senha_nova) return sendJson(res, 400, { erro: 'informe a senha atual e a nova senha' });
       if (senha_nova.length < 6) return sendJson(res, 400, { erro: 'a nova senha deve ter pelo menos 6 caracteres' });
-      if (!auth.verifyPassword(senha_atual, usuario.senha_hash, usuario.salt)) {
+      const credenciais = await db.prepare('SELECT senha_hash, salt FROM usuarios WHERE id = ?').get(usuario.id);
+      if (!credenciais || !auth.verifyPassword(senha_atual, credenciais.senha_hash, credenciais.salt)) {
         return sendJson(res, 401, { erro: 'senha atual incorreta' });
       }
       const { hash, salt } = auth.hashPassword(senha_nova);
       await db.prepare('UPDATE usuarios SET senha_hash = ?, salt = ? WHERE id = ?').run(hash, salt, usuario.id);
+      // Desloga os outros aparelhos/navegadores deste usuário; mantém a sessão atual.
+      await auth.destroyOtherSessions(usuario.id, session.sid);
       return sendJson(res, 200, { ok: true });
     }
 
@@ -403,9 +427,23 @@ async function garantirUsuarioAdmin() {
 //    conexão (broker ou HTTP) — assim nenhuma mensagem/requisição chega
 //    antes das tabelas existirem.
 // ---------------------------------------------------------------------------
+// Limpeza de sessões expiradas: na subida e a cada ~6h. unref() para o timer
+// não segurar o processo vivo sozinho. Erro aqui só loga — não é crítico.
+const LIMPEZA_SESSOES_MS = 6 * 60 * 60 * 1000;
+async function limparSessoes() {
+  try {
+    const n = await auth.limparSessoesExpiradas();
+    if (n) console.log(`[auth] ${n} sessão(ões) expirada(s) removida(s)`);
+  } catch (err) {
+    console.error('[auth] erro limpando sessões expiradas:', err.message);
+  }
+}
+
 async function iniciar() {
   await db.inicializarEsquema();
   await garantirUsuarioAdmin();
+  await limparSessoes();
+  setInterval(limparSessoes, LIMPEZA_SESSOES_MS).unref();
   broker.listen(BROKER_PORT);
   conectarBackendMqtt();
   emqx.iniciarPonte();

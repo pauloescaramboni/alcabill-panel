@@ -207,6 +207,9 @@ select option { background: var(--superficie); color: var(--texto); }
 .resumo-item.total b { color: var(--marca); }
 .resumo-item.online b { color: var(--verde); }
 .resumo-item.offline b { color: var(--texto); }
+/* só o total (placa ainda sem status): centralizado com largura natural */
+.resumo.unico { justify-content: center; }
+.resumo.unico .resumo-item { flex: 0 1 auto; min-width: 160px; padding: 14px 28px; }
 
 /* ---------- cartão de etiqueta ---------- */
 .cartao-etiqueta {
