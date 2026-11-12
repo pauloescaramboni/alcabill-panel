@@ -453,6 +453,7 @@ function abrirModalProdutos() {
       return `<li>
         <input type="text" id="pe-codigo-${p.id}" value="${p.codigo}" style="margin-bottom:6px" />
         <input type="text" id="pe-descricao-${p.id}" value="${p.descricao}" />
+        <div class="erro oculto" id="pe-erro-${p.id}"></div>
         <div class="linha-botoes">
           <button class="botao pequeno" data-salvar-produto="${p.id}">Salvar</button>
           <button class="botao pequeno secundario" data-cancelar-produto>Cancelar</button>
@@ -496,11 +497,22 @@ function abrirModalProdutos() {
       const id = Number(b.dataset.salvarProduto);
       const codigo = document.getElementById(`pe-codigo-${id}`).value.trim();
       const descricao = document.getElementById(`pe-descricao-${id}`).value.trim();
-      if (!codigo || !descricao) return;
-      await api(`/api/produtos/${id}`, { method: 'PUT', body: { codigo, descricao } });
-      produtoEditandoId = null;
-      await carregarTudo();
-      abrirModalProdutos();
+      const erroEl = document.getElementById(`pe-erro-${id}`);
+      erroEl.classList.add('oculto');
+      if (!codigo || !descricao) {
+        erroEl.textContent = 'Preencha código e descrição do produto.';
+        erroEl.classList.remove('oculto');
+        return;
+      }
+      try {
+        await api(`/api/produtos/${id}`, { method: 'PUT', body: { codigo, descricao } });
+        produtoEditandoId = null;
+        await carregarTudo();
+        abrirModalProdutos();
+      } catch (err) {
+        erroEl.textContent = err.message;
+        erroEl.classList.remove('oculto');
+      }
     });
   });
 
@@ -509,9 +521,13 @@ function abrirModalProdutos() {
     const descricao = document.getElementById('np-descricao').value.trim();
     const erroEl = document.getElementById('np-erro');
     erroEl.classList.add('oculto');
-    if (!codigo || !descricao) return;
+    if (!codigo || !descricao) {
+      erroEl.textContent = 'Preencha código e descrição do novo produto.';
+      erroEl.classList.remove('oculto');
+      return;
+    }
     try {
-      await api('/api/produtos', { method: 'POST', body: { codigo, descricao } });
+      await api('/api/produtos',{ method: 'POST', body: { codigo, descricao } });
       await carregarTudo();
       abrirModalProdutos();
     } catch (err) {
@@ -585,7 +601,11 @@ document.getElementById('btn-nova-etiqueta').addEventListener('click', () => {
       const nova = await api('/api/etiquetas', { method: 'POST', body: corpo });
       fecharModal();
       await carregarTudo();
-      alert(`Etiqueta ${nova.id} criada e enviada para a placa.`);
+      // Sem placa na coluna, a ponte ainda pode usar o MAPA_ETIQUETAS do
+      // servidor — por isso a mensagem neutra em vez de afirmar "sem placa".
+      alert(nova.dispositivo
+        ? `Etiqueta ${nova.id} criada e enviada para a placa ${nova.dispositivo}.`
+        : `Etiqueta ${nova.id} criada. Nenhuma placa vinculada pelo painel — se não houver placa configurada para ela, só aparece no painel.`);
     } catch (err) {
       erroEl.textContent = err.message;
       erroEl.classList.remove('oculto');

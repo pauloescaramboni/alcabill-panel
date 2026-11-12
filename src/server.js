@@ -208,6 +208,11 @@ function ehConflitoDispositivo(err) {
   return err && err.code === '23505' && String(err.constraint || err.message || '').includes('etiquetas_dispositivo_unico');
 }
 
+// Violação do UNIQUE de produtos.codigo (código já cadastrado).
+function ehCodigoProdutoDuplicado(err) {
+  return err && err.code === '23505' && !ehConflitoDispositivo(err);
+}
+
 function sendJson(res, statusCode, obj, extraHeaders = {}) {
   const body = JSON.stringify(obj);
   res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8', ...extraHeaders });
@@ -344,8 +349,14 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/produtos' && req.method === 'POST') {
       const { codigo, descricao } = await readBody(req);
       if (!codigo || !descricao) return sendJson(res, 400, { erro: 'código e descrição são obrigatórios' });
-      const info = await db.prepare('INSERT INTO produtos (codigo, descricao, criado_em) VALUES (?, ?, ?)')
-        .run(codigo, descricao, new Date().toISOString());
+      let info;
+      try {
+        info = await db.prepare('INSERT INTO produtos (codigo, descricao, criado_em) VALUES (?, ?, ?)')
+          .run(codigo, descricao, new Date().toISOString());
+      } catch (err) {
+        if (ehCodigoProdutoDuplicado(err)) return sendJson(res, 409, { erro: `Já existe um produto com o código ${codigo}.` });
+        throw err;
+      }
       return sendJson(res, 201, await db.prepare('SELECT * FROM produtos WHERE id = ?').get(Number(info.lastInsertRowid)));
     }
     const produtoMatch = pathname.match(/^\/api\/produtos\/(\d+)$/);
@@ -355,7 +366,25 @@ const server = http.createServer(async (req, res) => {
       if (!codigo || !descricao) return sendJson(res, 400, { erro: 'código e descrição são obrigatórios' });
       const produto = await db.prepare('SELECT * FROM produtos WHERE id = ?').get(produtoId);
       if (!produto) return sendJson(res, 404, { erro: 'produto não encontrado' });
-      await db.prepare('UPDATE produtos SET codigo = ?, descricao = ? WHERE id = ?').run(codigo, descricao, produtoId);
+      const mudouCodigo = String(codigo) !== String(produto.codigo);
+      const mudouDescricao = String(descricao) !== String(produto.descricao);
+      if (mudouCodigo || mudouDescricao) {
+        try {
+          await db.prepare('UPDATE produtos SET codigo = ?, descricao = ? WHERE id = ?').run(codigo, descricao, produtoId);
+        } catch (err) {
+          if (ehCodigoProdutoDuplicado(err)) return sendJson(res, 409, { erro: `Já existe um produto com o código ${codigo}.` });
+          throw err;
+        }
+        // O texto do e-paper vem do produto: reenvia para todas as etiquetas
+        // dele (nova versão, como numa edição da própria etiqueta).
+        const etiquetasDoProduto = await db.prepare('SELECT id FROM etiquetas WHERE produto_id = ?').all(produtoId);
+        for (const { id: etiquetaId } of etiquetasDoProduto) {
+          if (mudouCodigo) await registrarHistorico(etiquetaId, 'código do produto', produto.codigo, codigo, usuario.nome);
+          if (mudouDescricao) await registrarHistorico(etiquetaId, 'descrição do produto', produto.descricao, descricao, usuario.nome);
+          await db.prepare('UPDATE etiquetas SET version = version + 1 WHERE id = ?').run(etiquetaId);
+          await publicarComando(etiquetaId);
+        }
+      }
       return sendJson(res, 200, await db.prepare('SELECT * FROM produtos WHERE id = ?').get(produtoId));
     }
 
