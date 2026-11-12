@@ -18,6 +18,12 @@
 //                   o mapa é usado quando a coluna nunca foi definida/NULL e
 //                   é copiado para a coluna no boot — ver migrarDispositivosDoMapa)
 //
+// Heartbeat da placa (placa -> painel): a placa publica, a cada vez que
+// acorda (dorme 15 min), TEXTO retido QoS 0 em `alcabill/<dispositivo>/status`
+// no formato `v1|<epoch>|<bateria_mV>|<rssi>` (ex.: v1|1762960000|3980|-61).
+// A ponte assina `alcabill/+/status` e repassa a aoReceberStatus (opção de
+// iniciarPonte), já interpretado por parseStatus().
+//
 // Sem MQTT_URL a ponte fica desativada e publicarNaEtiqueta() vira no-op.
 // ---------------------------------------------------------------------------
 
@@ -95,6 +101,23 @@ function resolverDispositivo(id, coluna, mapaEtiquetas = new Map()) {
   return doMapa ? { dispositivo: doMapa, origem: 'mapa' } : { dispositivo: null, origem: null };
 }
 
+// Função pura: interpreta o heartbeat `v1|<epoch>|<bateria_mV>|<rssi>`.
+// Devolve { epoch, bateriaMv, rssi } ou null (malformado / versão desconhecida).
+const RE_INTEIRO = /^-?\d+$/;
+function parseStatus(texto) {
+  if (texto === null || texto === undefined) return null;
+  const partes = String(texto).trim().split('|');
+  if (partes.length !== 4 || partes[0] !== 'v1') return null;
+  const nums = partes.slice(1).map((p) => p.trim());
+  if (!nums.every((p) => RE_INTEIRO.test(p))) return null;
+  const [epoch, bateriaMv, rssi] = nums.map(Number);
+  if (epoch < 0 || bateriaMv < 0) return null;
+  return { epoch, bateriaMv, rssi };
+}
+
+const TOPICO_STATUS = 'alcabill/+/status';
+const RE_TOPICO_STATUS = /^alcabill\/([^/]+)\/status$/;
+
 // Usa o mapa carregado do ambiente (em iniciarPonte ou, se a ponte ainda não
 // subiu, lido na hora).
 function dispositivoDaEtiqueta(id, coluna) {
@@ -102,7 +125,9 @@ function dispositivoDaEtiqueta(id, coluna) {
   return resolverDispositivo(id, coluna, m);
 }
 
-function iniciarPonte(env = process.env) {
+// opcoes.aoReceberStatus(dispositivo, { epoch, bateriaMv, rssi }) é chamado a
+// cada heartbeat válido (pode ser async; erros são capturados aqui).
+function iniciarPonte(env = process.env, { aoReceberStatus } = {}) {
   if (iniciada) return;
   iniciada = true;
   mapa = parseMapa(env.MAPA_ETIQUETAS);
@@ -142,6 +167,34 @@ function iniciarPonte(env = process.env) {
 
   client.on('connect', () => {
     console.log(`[emqx] conectado a ${host} como ${clientId}`);
+    // 'connect' dispara também a cada reconexão; como a sessão é clean,
+    // assinamos de novo toda vez.
+    client.subscribe(TOPICO_STATUS, { qos: 0 }, (err) => {
+      if (err) console.error(`[emqx] falha ao assinar ${TOPICO_STATUS}:`, err.message);
+      else console.log(`[emqx] assinado ${TOPICO_STATUS}`);
+    });
+  });
+  client.on('message', (topico, payload) => {
+    try {
+      const m = RE_TOPICO_STATUS.exec(topico);
+      if (!m) return;
+      const texto = payload ? payload.toString('utf8') : '';
+      if (!texto.trim()) return; // retido apagado
+      const dispositivo = m[1];
+      const dados = parseStatus(texto);
+      if (!dados) {
+        console.log(`[emqx] heartbeat inválido de ${dispositivo}: ${JSON.stringify(texto.slice(0, 80))}`);
+        return;
+      }
+      console.log(`[emqx] heartbeat de ${dispositivo}: epoch=${dados.epoch} bateria=${dados.bateriaMv}mV rssi=${dados.rssi}dBm`);
+      if (typeof aoReceberStatus === 'function') {
+        Promise.resolve(aoReceberStatus(dispositivo, dados)).catch((err) => {
+          console.error(`[emqx] erro tratando heartbeat de ${dispositivo}:`, err && err.message);
+        });
+      }
+    } catch (err) {
+      console.error('[emqx] erro processando mensagem:', err && err.message);
+    }
   });
   client.on('reconnect', () => console.log('[emqx] tentando reconectar...'));
   client.on('offline', () => console.log('[emqx] offline'));
@@ -200,6 +253,7 @@ module.exports = {
   resolverDispositivo,
   normalizarDispositivo,
   montarPayload,
+  parseStatus,
   parseMapa,
   limparCampo,
 };

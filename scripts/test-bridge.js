@@ -3,7 +3,7 @@
 // Testes da ponte EMQX (sem dependências: só node:assert).
 // Uso: npm test
 const assert = require('node:assert/strict');
-const { montarPayload, parseMapa, normalizarDispositivo, resolverDispositivo } = require('../src/emqx-bridge');
+const { montarPayload, parseMapa, normalizarDispositivo, resolverDispositivo, parseStatus } = require('../src/emqx-bridge');
 
 let ok = 0;
 function teste(nome, fn) {
@@ -96,6 +96,24 @@ teste('resolverDispositivo: coluna vazia (desvinculada) não cai no mapa', () =>
   const m = parseMapa('ALC-000001=etiqueta01');
   assert.deepEqual(resolverDispositivo('ALC-000001', '', m), { dispositivo: null, origem: null });
   assert.deepEqual(resolverDispositivo('ALC-000001', '  ', m), { dispositivo: null, origem: null });
+});
+
+teste('parseStatus: exemplo da placa', () => {
+  assert.deepEqual(parseStatus('v1|1762960000|3980|-61'), { epoch: 1762960000, bateriaMv: 3980, rssi: -61 });
+});
+
+teste('parseStatus: epoch 0, bateria baixa (USB) e espaços/quebra de linha', () => {
+  assert.deepEqual(parseStatus('v1|0|120|-90'), { epoch: 0, bateriaMv: 120, rssi: -90 });
+  assert.deepEqual(parseStatus(' v1|1762960000|3980|-61\r\n'), { epoch: 1762960000, bateriaMv: 3980, rssi: -61 });
+  assert.deepEqual(parseStatus(Buffer.from('v1|1|2|3')), { epoch: 1, bateriaMv: 2, rssi: 3 });
+});
+
+teste('parseStatus: malformados e versão desconhecida -> null', () => {
+  for (const v of [null, undefined, '', 'v1', 'v1|1|2', 'v1|1|2|3|4', 'v2|1762960000|3980|-61',
+    'V1|1762960000|3980|-61', 'v1|abc|3980|-61', 'v1|1762960000|3.9|-61', 'v1||3980|-61',
+    'v1|-5|3980|-61', 'v1|1762960000|-1|-61', '{"bateria":3980}']) {
+    assert.equal(parseStatus(v), null, `deveria rejeitar ${JSON.stringify(v)}`);
+  }
 });
 
 console.log(`\n${ok} teste(s) passaram.`);

@@ -292,6 +292,26 @@ aparecem no painel, a variável pode ser removida do Render.
 Etiquetas sem placa não são publicadas (só aparece um aviso no log). Testes
 da montagem do texto e do vínculo: `npm test`.
 
+### Heartbeat da placa (online/offline)
+
+A placa publica, a cada vez que acorda (dorme 15 min entre envios), em
+`alcabill/<dispositivo>/status` (QoS 0, retain) o texto
+`v1|<epoch>|<bateria_mV>|<rssi>`, ex.: `v1|1762960000|3980|-61` (`epoch` =
+segundos Unix do relógio NTP da placa, ou `0` se desconhecido). O painel
+assina `alcabill/+/status`, acha a etiqueta pela coluna `dispositivo` e grava
+`ultima_comunicacao` (usa o epoch da placa se for plausível — a mensagem é
+retida e volta a cada reinício do painel), `bateria_v` (mV/1000; abaixo de
+500 mV = sem bateria/USB, fica vazio) e `rssi`.
+
+Como a placa passa a maior parte do tempo dormindo, o painel considera a
+etiqueta **online** se ela comunicou nos últimos 35 min (2 ciclos + folga) e
+mostra "online/offline · visto há …" no cartão.
+
+Se a autorização (ACL) do EMQX estiver ativa: o usuário `painel` precisa de
+permissão de **SUBSCRIBE** em `alcabill/+/status`, e cada usuário de placa
+(ex.: `etiqueta01`) precisa de **PUBLISH** no seu próprio
+`alcabill/<placa>/status` (ex.: `alcabill/etiqueta01/status`).
+
 ## Estrutura do projeto
 
 ```

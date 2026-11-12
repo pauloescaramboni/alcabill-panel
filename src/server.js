@@ -540,6 +540,34 @@ async function limparSessoes() {
   }
 }
 
+// Heartbeat da placa real via EMQX (alcabill/<dispositivo>/status). A
+// mensagem é retida: ao reiniciar o painel o broker reentrega o último
+// heartbeat, então usamos o relógio da placa (epoch) quando é plausível,
+// para o "visto há" não fingir que a placa acabou de falar.
+const EPOCH_MINIMO = 1700000000;
+const TOLERANCIA_FUTURO_MS = 5 * 60 * 1000;
+function horarioDoHeartbeat(epoch, agoraMs = Date.now()) {
+  const ms = epoch * 1000;
+  if (epoch > EPOCH_MINIMO && ms <= agoraMs + TOLERANCIA_FUTURO_MS) return new Date(ms).toISOString();
+  return new Date(agoraMs).toISOString();
+}
+
+async function registrarHeartbeat(dispositivo, { epoch, bateriaMv, rssi }) {
+  try {
+    const etiqueta = await db.prepare('SELECT id FROM etiquetas WHERE dispositivo = ?').get(dispositivo);
+    if (!etiqueta) {
+      console.log(`[emqx] heartbeat de ${dispositivo} ignorado: nenhuma etiqueta vinculada a essa placa`);
+      return;
+    }
+    // < 500 mV = sem bateria / alimentada por USB -> desconhecido.
+    const bateriaV = bateriaMv >= 500 ? bateriaMv / 1000 : null;
+    await db.prepare('UPDATE etiquetas SET ultima_comunicacao = ?, bateria_v = ?, rssi = ?, online = 1 WHERE id = ?')
+      .run(horarioDoHeartbeat(epoch), bateriaV, rssi, etiqueta.id);
+  } catch (err) {
+    console.error(`[emqx] erro gravando heartbeat de ${dispositivo}:`, err && err.message);
+  }
+}
+
 async function iniciar() {
   await db.inicializarEsquema();
   // Compatibilidade: copia MAPA_ETIQUETAS para a coluna `dispositivo` onde
@@ -554,7 +582,7 @@ async function iniciar() {
   setInterval(limparSessoes, LIMPEZA_SESSOES_MS).unref();
   broker.listen(BROKER_PORT);
   conectarBackendMqtt();
-  emqx.iniciarPonte();
+  emqx.iniciarPonte(process.env, { aoReceberStatus: registrarHeartbeat });
   server.listen(HTTP_PORT, () => {
     console.log(`[http] painel ALCABILL em http://localhost:${HTTP_PORT}`);
     console.log('Se ainda não criou um usuário, rode: npm run seed');

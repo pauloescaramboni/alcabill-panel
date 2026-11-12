@@ -192,7 +192,7 @@ function rotuloStatus(s) {
 function tempoRelativo(iso) {
   if (!iso) return 'nunca';
   const diffMs = Date.now() - new Date(iso).getTime();
-  const s = Math.floor(diffMs / 1000);
+  const s = Math.max(0, Math.floor(diffMs / 1000)); // relógio da placa adiantado
   if (s < 60) return `há ${s}s`;
   const m = Math.floor(s / 60);
   if (m < 60) return `há ${m} min`;
@@ -209,6 +209,15 @@ function algumaComunicou() {
   return etiquetasCache.some(jaComunicou);
 }
 
+// A placa real dorme 15 min entre envios, então o flag `online` gravado não
+// diz nada: "online" = comunicou dentro da janela (2 ciclos + folga).
+const MINUTOS_PARA_OFFLINE = 35;
+function estaOnline(e) {
+  if (!e.ultima_comunicacao) return false;
+  const t = new Date(e.ultima_comunicacao).getTime();
+  return Number.isFinite(t) && Date.now() - t <= MINUTOS_PARA_OFFLINE * 60 * 1000;
+}
+
 function renderizarResumo() {
   const total = etiquetasCache.length;
   if (total === 0) { resumoEl.innerHTML = ''; return; }
@@ -220,7 +229,7 @@ function renderizarResumo() {
     resumoEl.innerHTML = `<div class="resumo-item total"><b>${total}</b><span>etiquetas</span></div>`;
     return;
   }
-  const online = etiquetasCache.filter((e) => e.online).length;
+  const online = etiquetasCache.filter(estaOnline).length;
   const offline = total - online;
   resumoEl.innerHTML = `
     <div class="resumo-item total"><b>${total}</b><span>etiquetas</span></div>
@@ -239,7 +248,7 @@ function renderizarLista() {
     chkOffline.checked = false;
     somenteOffline = false;
   }
-  let itens = somenteOffline ? etiquetasCache.filter((e) => !e.online) : etiquetasCache;
+  let itens = somenteOffline ? etiquetasCache.filter((e) => !estaOnline(e)) : etiquetasCache;
   if (termoBusca) {
     itens = itens.filter((e) => {
       const produto = (e.produto_descricao || '').toLowerCase();
@@ -295,7 +304,7 @@ function lerRascunhoEdicao() {
 function cartaoHtml(e) {
   const comunicou = jaComunicou(e);
   const linhaStatus = comunicou
-    ? `<div class="meta"><span class="status-dot ${e.online ? 'on' : 'off'}"></span>${e.online ? 'online' : 'offline'} · ${tempoRelativo(e.ultima_comunicacao)}</div>`
+    ? `<div class="meta"><span class="status-dot ${estaOnline(e) ? 'on' : 'off'}"></span>${estaOnline(e) ? 'online' : 'offline'} · visto ${tempoRelativo(e.ultima_comunicacao)}</div>`
     : '';
   const bateria = e.bateria_v != null
     ? `<div>Bateria<b>${Number(e.bateria_v).toFixed(2)} V</b></div>`
