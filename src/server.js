@@ -465,8 +465,29 @@ const server = http.createServer(async (req, res) => {
           await registrarHistorico(etiquetaId, 'dispositivo', etiqueta.dispositivo || null, dispositivoNovo || '(nenhuma)', usuario.nome);
           trocouPlaca = (dispositivoAntigo || '') !== dispositivoNovo;
         }
+        // Produto exibido pela etiqueta: valida antes de gravar qualquer campo.
+        // null/'' = sem produto. No histórico grava "código — descrição".
+        let produtoNovo; // undefined = não mexer
+        if (alteracoes.produto_id !== undefined) {
+          const pid = alteracoes.produto_id === null || alteracoes.produto_id === '' ? null : Number(alteracoes.produto_id);
+          if (pid !== null) {
+            const p = Number.isInteger(pid) ? await db.prepare('SELECT * FROM produtos WHERE id = ?').get(pid) : null;
+            if (!p) return sendJson(res, 400, { erro: 'produto inválido' });
+            produtoNovo = p;
+          } else {
+            produtoNovo = null;
+          }
+        }
         const campos = ['localizacao', 'status'];
         let mudou = false;
+        const produtoAtualId = etiqueta.produto_id == null ? null : Number(etiqueta.produto_id);
+        if (produtoNovo !== undefined && (produtoNovo ? produtoNovo.id : null) !== produtoAtualId) {
+          const produtoAntigo = produtoAtualId !== null ? await db.prepare('SELECT * FROM produtos WHERE id = ?').get(produtoAtualId) : null;
+          const textoProduto = (p) => (p ? `${p.codigo} — ${p.descricao}` : '(nenhum)');
+          await registrarHistorico(etiquetaId, 'produto', produtoAtualId !== null ? textoProduto(produtoAntigo) : null, textoProduto(produtoNovo), usuario.nome);
+          await db.prepare('UPDATE etiquetas SET produto_id = ? WHERE id = ?').run(produtoNovo ? produtoNovo.id : null, etiquetaId);
+          mudou = true;
+        }
         for (const campo of campos) {
           if (alteracoes[campo] !== undefined && String(alteracoes[campo]) !== String(etiqueta[campo])) {
             await registrarHistorico(etiquetaId, campo, etiqueta[campo], alteracoes[campo], usuario.nome);
@@ -541,18 +562,25 @@ async function limparSessoes() {
 }
 
 // Heartbeat da placa real via EMQX (alcabill/<dispositivo>/status). A
-// mensagem é retida: ao reiniciar o painel o broker reentrega o último
-// heartbeat, então usamos o relógio da placa (epoch) quando é plausível,
-// para o "visto há" não fingir que a placa acabou de falar.
+// mensagem é retida: ao reiniciar o painel (o Render reinicia/acorda o
+// serviço com frequência) ou a cada reconexão ao EMQX, o broker reentrega o
+// último heartbeat — mesmo com a placa desligada há horas. Por isso:
+//   - heartbeat ao vivo: horário = relógio da placa (epoch) se plausível,
+//     senão o horário de chegada (é agora mesmo);
+//   - heartbeat RETIDO (reentregue): só vale com epoch plausível; sem epoch
+//     não dá para saber quando foi enviado, então NÃO mexe em
+//     ultima_comunicacao (antes gravava "agora" e a placa desligada voltava a
+//     aparecer online a cada reinício/reconexão do painel).
+// Além disso ultima_comunicacao nunca anda para trás.
 const EPOCH_MINIMO = 1700000000;
 const TOLERANCIA_FUTURO_MS = 5 * 60 * 1000;
-function horarioDoHeartbeat(epoch, agoraMs = Date.now()) {
+function horarioDoHeartbeat(epoch, retido = false, agoraMs = Date.now()) {
   const ms = epoch * 1000;
-  if (epoch > EPOCH_MINIMO && ms <= agoraMs + TOLERANCIA_FUTURO_MS) return new Date(ms).toISOString();
-  return new Date(agoraMs).toISOString();
+  if (epoch > EPOCH_MINIMO && ms <= agoraMs + TOLERANCIA_FUTURO_MS) return new Date(Math.min(ms, agoraMs)).toISOString();
+  return retido ? null : new Date(agoraMs).toISOString();
 }
 
-async function registrarHeartbeat(dispositivo, { epoch, bateriaMv, rssi }) {
+async function registrarHeartbeat(dispositivo, { epoch, bateriaMv, rssi }, { retido = false } = {}) {
   try {
     const etiqueta = await db.prepare('SELECT id FROM etiquetas WHERE dispositivo = ?').get(dispositivo);
     if (!etiqueta) {
@@ -561,8 +589,16 @@ async function registrarHeartbeat(dispositivo, { epoch, bateriaMv, rssi }) {
     }
     // < 500 mV = sem bateria / alimentada por USB -> desconhecido.
     const bateriaV = bateriaMv >= 500 ? bateriaMv / 1000 : null;
-    await db.prepare('UPDATE etiquetas SET ultima_comunicacao = ?, bateria_v = ?, rssi = ?, online = 1 WHERE id = ?')
-      .run(horarioDoHeartbeat(epoch), bateriaV, rssi, etiqueta.id);
+    const horario = horarioDoHeartbeat(epoch, retido);
+    if (!horario) {
+      console.log(`[emqx] heartbeat retido de ${dispositivo} sem horário confiável — "visto há" não alterado`);
+      return;
+    }
+    // Datas em ISO-8601 UTC (toISOString) comparam certo como texto.
+    await db.prepare(`UPDATE etiquetas SET
+        ultima_comunicacao = CASE WHEN ultima_comunicacao IS NULL OR ultima_comunicacao < ? THEN ? ELSE ultima_comunicacao END,
+        bateria_v = ?, rssi = ?, online = 1 WHERE id = ?`)
+      .run(horario, horario, bateriaV, rssi, etiqueta.id);
   } catch (err) {
     console.error(`[emqx] erro gravando heartbeat de ${dispositivo}:`, err && err.message);
   }

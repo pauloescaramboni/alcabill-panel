@@ -183,12 +183,25 @@ function aplicarListaPendente() {
   renderizarLista();
 }
 
-// Status de estoque da etiqueta (valor gravado → rótulo visível).
-const ROTULOS_STATUS = { ok: 'OK', baixo: 'Baixo', falta: 'Falta' };
+// Status de estoque da etiqueta (valor gravado → rótulo visível). Sempre em
+// maiúsculas, igual ao e-paper (cartão, select e histórico).
+const ROTULOS_STATUS = { ok: 'OK', baixo: 'BAIXO', falta: 'FALTA' };
 function rotuloStatus(s) {
-  return ROTULOS_STATUS[s] || s;
+  return ROTULOS_STATUS[s] || String(s ?? '').toUpperCase();
 }
 
+// Nome amigável do campo no histórico (só exibição; o banco guarda o nome
+// técnico, ex.: "localizacao").
+const ROTULOS_CAMPO = { localizacao: 'localização', status: 'status', produto: 'produto', produto_id: 'produto', dispositivo: 'placa vinculada' };
+function rotuloCampo(c) {
+  return ROTULOS_CAMPO[c] || c;
+}
+function valorHistorico(campo, v) {
+  if (v == null) return '—';
+  return campo === 'status' ? rotuloStatus(v) : v;
+}
+
+// Formatador único de tempo relativo (cartão "visto há…" e histórico).
 function tempoRelativo(iso) {
   if (!iso) return 'nunca';
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -197,7 +210,9 @@ function tempoRelativo(iso) {
   const m = Math.floor(s / 60);
   if (m < 60) return `há ${m} min`;
   const h = Math.floor(m / 60);
-  return `há ${h}h`;
+  if (h < 24) return `há ${h}h`;
+  const d = Math.floor(h / 24);
+  return `há ${d} ${d === 1 ? 'dia' : 'dias'}`;
 }
 
 // A placa ainda pode não reportar status (online/offline, bateria). Enquanto
@@ -210,8 +225,11 @@ function algumaComunicou() {
 }
 
 // A placa real dorme 15 min entre envios, então o flag `online` gravado não
-// diz nada: "online" = comunicou dentro da janela (2 ciclos + folga).
-const MINUTOS_PARA_OFFLINE = 35;
+// diz nada: "online" = comunicou dentro da janela (1 ciclo de 15 min + 5 min
+// de folga). Regra ÚNICA: usada no cartão, nos contadores do topo e no filtro
+// "mostrar só offline". Desligada logo depois de acordar, a placa leva até
+// 20 min para aparecer offline (não dá para ser instantâneo: ela dorme).
+const MINUTOS_PARA_OFFLINE = 20;
 function estaOnline(e) {
   if (!e.ultima_comunicacao) return false;
   const t = new Date(e.ultima_comunicacao).getTime();
@@ -292,10 +310,12 @@ function lerRascunhoEdicao() {
   const sts = document.getElementById(`sts-${edicaoAbertaId}`);
   if (!loc || !sts) return null;
   const disp = document.getElementById(`disp-${edicaoAbertaId}`);
+  const prod = document.getElementById(`prod-${edicaoAbertaId}`);
   const erroEl = document.getElementById(`erro-edicao-${edicaoAbertaId}`);
   return {
     localizacao: loc.value,
     status: sts.value,
+    produto: prod ? prod.value : null,
     dispositivo: disp ? disp.value : null,
     erro: erroEl && !erroEl.classList.contains('oculto') ? erroEl.textContent : '',
   };
@@ -368,7 +388,13 @@ function abrirEdicao(id, rascunho = null) {
   const valorLoc = rascunho ? rascunho.localizacao : (e.localizacao || '');
   const valorSts = rascunho ? rascunho.status : e.status;
   const valorDisp = rascunho && rascunho.dispositivo !== null ? rascunho.dispositivo : (e.dispositivo || '');
+  const valorProd = rascunho && rascunho.produto !== null ? rascunho.produto : (e.produto_id == null ? '' : String(e.produto_id));
+  // "(sem produto)" só aparece se a etiqueta ainda não tem produto.
+  const opcoesProduto = (e.produto_id == null ? '<option value="">(sem produto vinculado)</option>' : '')
+    + produtosCache.map((p) => `<option value="${p.id}" ${String(p.id) === valorProd ? 'selected' : ''}>${esc(p.codigo)} — ${esc(p.descricao)}</option>`).join('');
   painel.innerHTML = `
+    <label for="prod-${id}">Produto</label>
+    <select id="prod-${id}">${opcoesProduto}</select>
     <label>Localização</label>
     <input type="text" id="loc-${id}" />
     <label>Status</label>
@@ -407,6 +433,11 @@ async function salvarEdicao(id) {
   // Placa: só admin envia, e só se mudou (a API normaliza e valida de novo).
   const dispEl = document.getElementById(`disp-${id}`);
   const e = etiquetasCache.find((x) => x.id === id);
+  // Produto: só envia se mudou (a API valida, grava no histórico e publica).
+  const prodEl = document.getElementById(`prod-${id}`);
+  if (prodEl && e && prodEl.value !== (e.produto_id == null ? '' : String(e.produto_id))) {
+    body.produto_id = prodEl.value ? Number(prodEl.value) : null;
+  }
   if (dispEl && ehAdmin()) {
     const novo = dispEl.value.trim().toLowerCase();
     if (novo !== ((e && e.dispositivo) || '')) body.dispositivo = novo;
@@ -432,7 +463,7 @@ async function reenviar(id) {
 async function abrirHistorico(id) {
   const hist = await api(`/api/etiquetas/${id}/historico`);
   const linhas = hist.length
-    ? hist.map((h) => `<li><b>${h.campo}</b>: ${h.valor_antigo ?? '—'} → ${h.valor_novo} <span class="meta">(${h.usuario}, ${tempoRelativo(h.criado_em)})</span></li>`).join('')
+    ? hist.map((h) => `<li><b>${esc(rotuloCampo(h.campo))}</b>: ${esc(valorHistorico(h.campo, h.valor_antigo))} → ${esc(valorHistorico(h.campo, h.valor_novo))} <span class="meta">(${esc(h.usuario)}, ${tempoRelativo(h.criado_em)})</span></li>`).join('')
     : '<li class="meta">Sem alterações registradas ainda.</li>';
   abrirModal(`<h3>Histórico — ${id}</h3><ul class="historico-lista">${linhas}</ul><button class="botao" data-fechar>Fechar</button>`);
 }

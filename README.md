@@ -299,13 +299,20 @@ A placa publica, a cada vez que acorda (dorme 15 min entre envios), em
 `v1|<epoch>|<bateria_mV>|<rssi>`, ex.: `v1|1762960000|3980|-61` (`epoch` =
 segundos Unix do relógio NTP da placa, ou `0` se desconhecido). O painel
 assina `alcabill/+/status`, acha a etiqueta pela coluna `dispositivo` e grava
-`ultima_comunicacao` (usa o epoch da placa se for plausível — a mensagem é
-retida e volta a cada reinício do painel), `bateria_v` (mV/1000; abaixo de
-500 mV = sem bateria/USB, fica vazio) e `rssi`.
+`ultima_comunicacao` (usa o epoch da placa se for plausível), `bateria_v`
+(mV/1000; abaixo de 500 mV = sem bateria/USB, fica vazio) e `rssi`. A
+mensagem é retida e o EMQX a reentrega a cada reinício/reconexão do painel:
+essa reentrega (flag retain) só conta se tiver epoch plausível — sem epoch
+ela é ignorada, para uma placa desligada não "voltar" a ficar online — e
+`ultima_comunicacao` nunca anda para trás.
 
 Como a placa passa a maior parte do tempo dormindo, o painel considera a
-etiqueta **online** se ela comunicou nos últimos 35 min (2 ciclos + folga) e
-mostra "online/offline · visto há …" no cartão.
+etiqueta **online** se ela comunicou nos últimos 20 min (1 ciclo de 15 min +
+5 de folga; constante `MINUTOS_PARA_OFFLINE` em `public/app.js`, usada no
+cartão, nos contadores e no filtro "mostrar só offline") e mostra
+"online/offline · visto há …" no cartão. Depois de desligada, a placa leva
+até ~20 min para aparecer offline (não tem como ser instantâneo: ela dorme
+entre os envios).
 
 Se a autorização (ACL) do EMQX estiver ativa: o usuário `painel` precisa de
 permissão de **SUBSCRIBE** em `alcabill/+/status`, e cada usuário de placa

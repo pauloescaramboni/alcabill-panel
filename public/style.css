@@ -257,6 +257,9 @@ label .opcional { font-weight: 500; color: var(--texto-apagado); }
 .historico-lista li { padding: 10px 0; border-bottom: 1px solid var(--linha); overflow-wrap: anywhere; }
 .historico-lista b { color: var(--texto); font-weight: 700; }
 .linha-produto { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+/* O texto do produto quebra; o botão "editar" nunca encolhe nem quebra. */
+.linha-produto > span { flex: 1 1 auto; min-width: 0; }
+.linha-produto > .botao { flex-shrink: 0; white-space: nowrap; overflow-wrap: normal; word-break: normal; }
 
 /* ---------- modais / bottom-sheets ---------- */
 @keyframes fundo-entrar { from { opacity: 0; } to { opacity: 1; } }

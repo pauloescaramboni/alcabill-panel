@@ -125,8 +125,9 @@ function dispositivoDaEtiqueta(id, coluna) {
   return resolverDispositivo(id, coluna, m);
 }
 
-// opcoes.aoReceberStatus(dispositivo, { epoch, bateriaMv, rssi }) é chamado a
-// cada heartbeat válido (pode ser async; erros são capturados aqui).
+// opcoes.aoReceberStatus(dispositivo, { epoch, bateriaMv, rssi }, { retido })
+// é chamado a cada heartbeat válido (pode ser async; erros são capturados
+// aqui). `retido` = mensagem retida reentregue pelo broker, não ao vivo.
 function iniciarPonte(env = process.env, { aoReceberStatus } = {}) {
   if (iniciada) return;
   iniciada = true;
@@ -174,7 +175,7 @@ function iniciarPonte(env = process.env, { aoReceberStatus } = {}) {
       else console.log(`[emqx] assinado ${TOPICO_STATUS}`);
     });
   });
-  client.on('message', (topico, payload) => {
+  client.on('message', (topico, payload, packet) => {
     try {
       const m = RE_TOPICO_STATUS.exec(topico);
       if (!m) return;
@@ -186,9 +187,12 @@ function iniciarPonte(env = process.env, { aoReceberStatus } = {}) {
         console.log(`[emqx] heartbeat inválido de ${dispositivo}: ${JSON.stringify(texto.slice(0, 80))}`);
         return;
       }
-      console.log(`[emqx] heartbeat de ${dispositivo}: epoch=${dados.epoch} bateria=${dados.bateriaMv}mV rssi=${dados.rssi}dBm`);
+      // retain=true só chega quando o broker reentrega o retido (ao assinar,
+      // ou seja, a cada (re)conexão do painel) — não é a placa falando agora.
+      const retido = !!(packet && packet.retain);
+      console.log(`[emqx] heartbeat${retido ? ' retido' : ''} de ${dispositivo}: epoch=${dados.epoch} bateria=${dados.bateriaMv}mV rssi=${dados.rssi}dBm`);
       if (typeof aoReceberStatus === 'function') {
-        Promise.resolve(aoReceberStatus(dispositivo, dados)).catch((err) => {
+        Promise.resolve(aoReceberStatus(dispositivo, dados, { retido })).catch((err) => {
           console.error(`[emqx] erro tratando heartbeat de ${dispositivo}:`, err && err.message);
         });
       }
